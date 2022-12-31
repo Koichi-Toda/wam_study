@@ -1,3 +1,5 @@
+(This translation is created for studying basic idea of WAM)
+
 # Warran's Abstract Machine
 #### A Tutorial Reconstruction
 #### Hassan Ait-Kaci
