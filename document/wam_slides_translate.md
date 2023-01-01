@@ -868,18 +868,18 @@ M1では、(上記の意味でのX1レジスタは省略され、代わりに)
       値は、引数レジスタAiにセットする
   - その後に同じ変数が出現した場合は、Aiをユニファイする
 
-    ＜引数命令の疑似コード＞
-    ```
-    put_variable Xn,Ai ≡ HEAP[H] ← <REF,H>;
-                         Xn ← HEAP[H];
-                         Ai ← HEAP[H];
-                         H ← H + 1;
+＜引数命令の疑似コード＞
+```
+put_variable Xn,Ai ≡ HEAP[H] ← <REF,H>;
+                     Xn ← HEAP[H];
+                     Ai ← HEAP[H];
+                     H ← H + 1;
 
-    put_value Xn,Ai    ≡ Ai ← Xn
+put_value Xn,Ai    ≡ Ai ← Xn
 
-    get_variable Xn,Ai ≡ Xn ← Ai
+get_variable Xn,Ai ≡ Xn ← Ai
 
-    get_value Xn,Ai    ≡ unify(Xn,Ai)
+get_value Xn,Ai    ≡ unify(Xn,Ai)
 ```
 
 ```
