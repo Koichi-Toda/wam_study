@@ -14,13 +14,13 @@
 
 
 【目次】
-1. ユニフィケーション
-2. フラット・レゾリューション
-3. 純粋Prolog
-4. 最適化  
+1. [ユニフィケーション](#chapter1)
+2. [フラット・レゾリューション](#chapter2)
+3. [純粋Prolog](#chapter3)
+4. [最適化](#chapter4)
 
 　　　
-## 1. ユニフィケーション(Unification—Pure and Simple:)
+## <a name="chapter1"> 1. ユニフィケーション(Unification—Pure and Simple:) </a>
 
 　＜識別子の定義＞  
 ### 【一階述語論理の項(First-order term)】
@@ -968,7 +968,7 @@ L0プログラム「p(f(X),h(Y,f(a)),Y).」の仮想マシンM0のマシンコ�
 
 
 
-## 【２】Languege L2: Flat Resolution
+## <a name="chapter2">2.Languege L2: Flat Resolution </a>
 
   L2は、Prologの基本言語仕様のうちバックトラックだけが未実装のものである。
   - L2は、L1をさらに拡張し、手続き処理として bodyを持っている場合も含める。
@@ -1192,7 +1192,7 @@ put_variable Yn,Ai ≡ addr ← E + n + 1;
 
 
 
-## 【３】純粋Prolog (Language L3: Pure Prolog)
+## <a name="chapter3">3.純粋Prolog (Language L3: Pure Prolog) </a>
 
   ### ・構文(Syntax of L3):
   - L3 はL2を拡張し、選言的な定義を許容する(注釈:つまり複数定義を可能とし、バックトラックを許す)
@@ -1605,7 +1605,7 @@ M3 code for a multiple-clause procedure
 
 
 
-## 【４】最適化 (Optimizing the Design)
+## <a name="chapter4">4. 最適化 (Optimizing the Design) </a>
 
 
 ##### WAM原理1
