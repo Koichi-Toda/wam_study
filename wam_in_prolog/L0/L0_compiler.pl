@@ -2,7 +2,7 @@
 %
 % L0 compiler written by prolog
 % 
-% ?- g(p(f(X),h(Y,f(a)),Y),L),write(L).
+% ?- compiler(p(f(X),h(Y,f(a)),Y),WAM_CODE),write(WAM_CODE).
 % [
 %    get_structure(p/3,x:1),
 %    unify_variable(x:2),
@@ -20,7 +20,7 @@
 
 
 :- dynamic count/1.
-g(T,L):-
+compiler(T,L):-
   terms(T,_,Ret),
   assert(count(0)),
   reg_assign(Ret,RetL,[],_),!,
