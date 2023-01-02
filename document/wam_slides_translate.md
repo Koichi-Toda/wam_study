@@ -1294,37 +1294,34 @@ aのbody部の実行を継続:
    - c を call;
    - 失敗(X=2≠1);
 
-    選択ポイントは、eの選択節としてBにより示される、
-    しかし、bの environment は、失われる。(ここがProblemか)
+選択ポイントは、eの選択節としてBにより示される、
+しかし、bの environment は、失われる。(ここがProblemか)
 
-    M3は、既存の選択ポイントよりも時間的に先行する environment フレームの回復不能な
-  　deallocation を防止する必要がある。
+M3は、既存の選択ポイントよりも時間的に先行する environment フレームの回復不能な
+deallocation を防止する必要がある。
 
 ##### IDEA:
-    全ての選択ポイントは、
-    それが生成されるようにも前に存在していた全ての environment(環境フレーム)
-    の deallocation から"保護"しなければならない。
+全ての選択ポイントは、
+それが生成されるようにも前に存在していた全ての environment(環境フレーム)
+の deallocation から"保護"しなければならない。
 
 ##### Solution:
-    M3は、environment(環境フレーム)と選択ポイントを同一のスタックで使用するようにする:  
-    これからは、選択ポイントは、全てのより古いenvironment(環境フレーム)をキャップ(保護)する。
+M3は、environment(環境フレーム)と選択ポイントを同一のスタックで使用するようにする:  
+これからは、選択ポイントは、全てのより古いenvironment(環境フレーム)をキャップ(保護)する。
 
-   - 選択ポイントがアクティブである限り、
-      （明示的にdeallocateされたものであっても）より古い environment(環境フレーム)の上書きを排除して、
-      強制的に environment(環境フレーム) のアロケーションを維持する。
-   - この選択ポイントから別の選択肢に戻ると、deallocateされたが 保護されている environment(環境フレーム)
-      　の安全な復活(resurrection)が自動的に行われる。
-   - この保護は必要とされる限り持続するが、
-      　この選択ポイントがなくなりしだい(disappers)、明示的にdeallocateされた
-        environment(環境フレーム)はすべて安全に上書きされることになる。
+  - 選択ポイントがアクティブである限り、
+    （明示的にdeallocateされたものであっても）より古い environment(環境フレーム)の上書きを排除して、
+    強制的に environment(環境フレーム) のアロケーションを維持する。
+  - この選択ポイントから別の選択肢に戻ると、deallocateされたが 保護されている environment(環境フレーム)の安全な復活(resurrection)が自動的に行われる。
+  - この保護は必要とされる限り持続するが、この選択ポイントがなくなりしだい(disappers)、明示的にdeallocateされたenvironment(環境フレーム)はすべて安全に上書きされることになる。
 
-    先の例に戻る・・・(Back to our example):  
-   - a の environment をアロケート
-   - b を call
-   - b の environment をアロケート
-   - e を call
-        - e の選択ポイントを作成してプッシュ
-        - e の environment をアロケート
+先の例に戻る・・・(Back to our example):  
+  - a の environment をアロケート
+  - b を call
+  - b の environment をアロケート
+  - e を call
+      - e の選択ポイントを作成してプッシュ
+      - e の environment をアロケート
 ```
         ＜図式＞
          |               :            |
