@@ -1332,10 +1332,10 @@ M3は、environment(環境フレーム)と選択ポイントを同一のスタ�
 ```
 
 
-      ・f を call
-      ・成功(X=2);
-      ・e の environment をデアロケート
-      ・b の environment をデアロケート
+  - f を call
+  - 成功(X=2);
+  - e の environment をデアロケート
+  - b の environment をデアロケート
 ```
       ＜図式＞
        |               :             |
@@ -1344,17 +1344,17 @@ M3は、environment(環境フレーム)と選択ポイントを同一のスタ�
   B -> |       Choice point for e    |
 ```
 
-    aのボディ部の実行を継続(Counting with execution of a's body:)
-      ・c を call
-      ・失敗(X=2≠1);
+aのボディ部の実行を継続(Counting with execution of a's body:)
+   - c を call
+   - 失敗(X=2≠1);
 
-    この時点で、M3は e の選択ポイント(Bで示されていた)を使って、
-    安全に状態を回復することができる。
-    この場合、復元する保存された environment は、
-    この選択ポイントの作成時において現在のもの（つまりb）である。
-      ・バックトラックする;
-      ・e の選択ポイントを破棄;
-    (環境の)保護はこの時点で(安全に)終了する。
+この時点で、M3は e の選択ポイント(Bで示されていた)を使って、
+安全に状態を回復することができる。
+この場合、復元する保存された environment は、
+この選択ポイントの作成時において現在のもの（つまりb）である。
+   - バックトラックする;
+   - e の選択ポイントを破棄;
+(環境の)保護はこの時点で(安全に)終了する。
 
 proceed のための、最後の選択肢の実行(Execution of the last alternative for e procceds with):  
 ```
@@ -1432,7 +1432,8 @@ M3では、M2の allocateの定義を変更する:
                     P ← P + instruction_size(P);
 ```
 ### 【選択命令(Choice instructions)】
-    与えられた 複数節の定義では、M3は、３つの命令を使用して取り扱う:
+与えられた 複数節の定義では、M3は、３つの命令を使用して取り扱う:
+
 1. 最初の節
 2. 中間の節(最後の節を除く)
 3. 最後の節
@@ -1551,25 +1552,27 @@ M3では、すべてのM2命令が失敗する可能性がある
 ```
 
 ### 【L3コンパイルについてのまとめ(Recapitulation of L3 compilation)】
-- M3コードでは、単一節の定義に対して生成されたものは、
-    　M2のL2プログラムに対して生成されたものと同一である。
+- M3コードでは、単一節の定義に対して生成されたものは、M2のL2プログラムに対して生成されたものと同一である。
 
 - 2つの節で定義された　手続き p/n の場合は、以下のようなパターンになる:
-        p/n : try_me_else L （最初の節のためのコード）
-        L   : trust_me       (2つめの節のためのコード)
+
+    p/n : try_me_else L （最初の節のためのコード）
+    L   : trust_me       (2つめの節のためのコード)
 
 - それ以上の数の節定義についは以下:
-        P/n : try_me_else L1
-        L1  : try_me_else L2
-        Lk-1: trey_me_else Lk
-        Lk  : trust_me
+
+    P/n : try_me_else L1
+    L1  : try_me_else L2
+    Lk-1: trey_me_else Lk
+    Lk  : trust_me
 
  各節は、M2の単一節L2と同じように翻訳される。
-
+```
   Example,
       p(X,a).
       p(b,X).
       p(X,Y) :- p(X,a), p(b,Y).
+```
 
 ```
   ＜サンプルコード＞
