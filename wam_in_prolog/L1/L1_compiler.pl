@@ -10,13 +10,6 @@ prolog(Code,Query):-
     wam((F/A,WAM_Code),WAM_Query),
     listing([reg_ax,reg_h,reg_p,store]).
 
-%%
-%% store[address] を導入すべきか？
-%% heap(address):- sore(address).
-%% stack(address):- store(address).
-%% こうすると、すべてのエリアは、基本的に storeで表現できることになる。(場合分けが不要となる場面が出てくる。addressだけ知っていればよいと。）
-
-
 :- dynamic code_area/3, store/2.
 :- dynamic reg_h/1, reg_s/1, reg_p/1.
 :- dynamic reg_ax/2.
@@ -154,7 +147,7 @@ wam_inst(unify_variable(AX)):-
 wam_inst(proceed). % do nothing.
 
 
-% irregular pattern (just in case)
+% catch irregular pattern
 wam_inst(Other):-
   writeln(not_impremented_wam_inst(Other)).
 
@@ -178,7 +171,7 @@ get_structure_case((str,ADDR),F/N):-
   (retract(unify_mode(_)) ; true),
   assert(unify_mode(read)).
 
-
+% deref(A :register index, ADDR_V :value on HEAP)
 % deref(レジスタIndex,HEAP上の値(タグ,値))
 deref(A,ADDR_V):-
     reg_ax(A,VALUE),
@@ -218,10 +211,6 @@ push(pdl,X):-
     (retract(pdl(Z)) ; Z = []),
     assert(pdl([X|Z])).
 
-% % wam slide の STORE[addr] 表現に合わせるための述語
-% store(ADDR,VALUE):-heap(ADDR,VALUE).
-
-%  unify(x:5,a:3):-writeln(called(unify(x:5,a:3),'---------------')).
 unify(x:5,a:3):-
     reg_ax(x:5,V_X5),
     reg_ax(a:3,V_A3),
@@ -257,24 +246,6 @@ unify_push_pdl(X,Y,ArityCntDown):-
     unify_push_pdl(Xplus,Yplus,ArityCntDown2).
 
 
-
-
-%%%% unify_bind_try(X,Y):-
-%% binは、UNBUND REF でなければならないのか？(derefの先がUNBUNDでなければならない、
-%% というのはそのとおりではないだろうか)
-
-
-% queryは別途制作した（今後統合する）
-% compile_query(p(Z,h(Z,W),f(W)),Query):-
-%    Query = [
-%	put_variable(x:4,a:1),
-%	put_structure(h/2,a:2),
-%	set_value(x:4),
-%	set_variable(x:5),
-%	put_structure(f/1,a:3),
-%	set_value(x:5),
-%	call(p/3)
-%    ].
 
 compile_code(T,L):-
     assert(count(0)),
@@ -369,14 +340,12 @@ reg_match(X,X,VL,VL).
 
 
 %% varuable assignment main part (firstry, all instaction command will build. and then adjust varuable assignment process.) 
-%% 変数割り付け処理本体(全ての命令列が出来上がってから、改めて変数処理をWAM命令実行順に従って変換する)
 var_assign([],[],VL,VL).
 var_assign([X|Y],[A|B],VL,VL__):-
     var_assign(X,A,VL,VL_),
     var_assign(Y,B,VL_,VL__).
 
 % if the valuable has already registerd, use 'set_value' otherwise use 'set_variable'
-% 既に変数がVL登録されている場合は、set_value そうでない場合は、 set_variable とする
 var_assign((unify_var(V),x:Index,a:A),get_value(x:Index,a:A),VL,VL):-
     find_var(V,VL,Index).
 var_assign((unify_var(V),x:Index,a:A),get_variable(x:Index,a:A),VL,VL_):-
@@ -385,14 +354,13 @@ var_assign((unify_var(V),x:Index),unify_value(x:Index),VL,VL):-
     find_var(V,VL,Index).
 var_assign((unify_var(V),x:Index),unify_variable(x:Index),VL,VL_):-
     VL_ = [vpair(Index,V)|VL].
+
 % assignment for structure should be register with no condition.
-% 構造体に対する参照系変数は、無条件で、VLに登録する
 var_assign((get_structure(X),x:Index),get_structure(X,x:Index),VL,[vpair(Index,X)|VL]).
 var_assign((get_structure(X),a:Index),get_structure(X,a:Index),VL,[vpair(Index,X)|VL]).
 var_assign(X,X,VL,VL).
 
 % find_var : cheking variable has already assigned.
-%            既に変数が割り付けられていないか確認する処理
 find_var(Var,[vpair(Index,V)|_],Index):-
     Var == V.
 find_var(Var,[_|L],Index):-
