@@ -23,153 +23,153 @@ heap(ADDRESS,VALUE):- store(ADDRESS,VALUE).
 
 
 wam((F/A,Code),Query):-
-  assert(reg_h(0)),
-  store_code(F/A,Code),
-  exec_query(Query).
+    assert(reg_h(0)),
+    store_code(F/A,Code),
+    exec_query(Query).
 
 % store wam code into CODE_AREA
 store_code(Label,[X|Z]):-
-  assert(code_area(0,Label,X)),
-  assert(reg_p(1)),
-  store_code(Z).
+    assert(code_area(0,Label,X)),
+    assert(reg_p(1)),
+    store_code(Z).
 store_code([]).
 store_code([X|Z]):-
-  store_code_(X),
-  store_code(Z).
+    store_code_(X),
+    store_code(Z).
 
 store_code_(Code):-
-  retract(reg_p(N)),
-  assert(code_area(N,_,Code)),
-  N1 is N + 1,
-  assert(reg_p(N1)).
+    retract(reg_p(N)),
+    assert(code_area(N,_,Code)),
+    N1 is N + 1,
+    assert(reg_p(N1)).
 
 exec_query([]).
 exec_query([X|Z]):-
-  exec_query_(X),
-  exec_query(Z).
+    exec_query_(X),
+    exec_query(Z).
 exec_query_(X):-
-  wam_inst(X).
+    wam_inst(X).
 
 
 %% WAM instuctions (for query)
 wam_inst(put_variable(x:X,a:A)):-
-  retract(reg_h(H)),
-  H_VALUE = (ref, H),
-  set(heap(H, H_VALUE)),
-  assert(reg_ax(x:X, H_VALUE)),
-  assert(reg_ax(a:A, H_VALUE)),
-  H1 is H + 1,
-  assert(reg_h(H1)).
+    retract(reg_h(H)),
+    H_VALUE = (ref, H),
+    set(heap(H, H_VALUE)),
+    assert(reg_ax(x:X, H_VALUE)),
+    assert(reg_ax(a:A, H_VALUE)),
+    H1 is H + 1,
+    assert(reg_h(H1)).
 
 wam_inst(set_variable(AX)):-
-  retract(reg_h(H)),
-  H_VALUE = (ref, H),
-  set(heap(H, H_VALUE)),
-  assert(reg_ax(AX, H_VALUE)),
-  H1 is H + 1,
-  assert(reg_h(H1)).
+    retract(reg_h(H)),
+    H_VALUE = (ref, H),
+    set(heap(H, H_VALUE)),
+    assert(reg_ax(AX, H_VALUE)),
+    H1 is H + 1,
+    assert(reg_h(H1)).
 
 wam_inst(set_value(AX)):-
-  retract(reg_h(H)),
-  reg_ax(AX, R_VALUE),
-  set(heap(H, R_VALUE)),
-  H1 is H + 1,
-  assert(reg_h(H1)).
+    retract(reg_h(H)),
+    reg_ax(AX, R_VALUE),
+    set(heap(H, R_VALUE)),
+    H1 is H + 1,
+    assert(reg_h(H1)).
 
 wam_inst(put_structure(F/A,AX)):-
-  retract(reg_h(H)),
-  H1 is H + 1,
-  H_VALUE = (str, H1),
-  set(heap(H, H_VALUE)),
-  set(heap(H1, F/A)),
-  assert(reg_ax(AX, H_VALUE)),
-  H2 is H + 2,
-  assert(reg_h(H2)).
+    retract(reg_h(H)),
+    H1 is H + 1,
+    H_VALUE = (str, H1),
+    set(heap(H, H_VALUE)),
+    set(heap(H1, F/A)),
+    assert(reg_ax(AX, H_VALUE)),
+    H2 is H + 2,
+    assert(reg_h(H2)).
 
 wam_inst(call(Label)):-
-  listing([reg_ax,reg_h,store,code_area]),
-  retract(reg_p(_)),
-  code_area(N,Label,FastCode),
-  N1 is N + 1,
-  assert(reg_p(N1)),
-  !,wam_inst(FastCode).
+    listing([reg_ax,reg_h,store,code_area]),
+    retract(reg_p(_)),
+    code_area(N,Label,FastCode),
+    N1 is N + 1,
+    assert(reg_p(N1)),
+    !,wam_inst(FastCode).
 
 
 %% WAM instructions (for program)
 wam_inst(get_structure(F/A,AX)):-
-  retract(reg_p(N)),
-  deref(AX,ADDR_V),!,
-  get_structure_case(ADDR_V,F/A),
-  code_area(N,_,Code),
-  N1 is N + 1,
-  assert(reg_p(N1)),
-  !,wam_inst(Code).
+    retract(reg_p(N)),
+    deref(AX,ADDR_V),!,
+    get_structure_case(ADDR_V,F/A),
+    code_area(N,_,Code),
+    N1 is N + 1,
+    assert(reg_p(N1)),
+    !,wam_inst(Code).
 
 wam_inst(get_value(X,A)):-
-  unify(X,A),
-  retract(reg_p(N)),
-  code_area(N,_,Code),
-  N1 is N + 1,
-  assert(reg_p(N1)),
-  !,wam_inst(Code).
+    unify(X,A),
+    retract(reg_p(N)),
+    code_area(N,_,Code),
+    N1 is N + 1,
+    assert(reg_p(N1)),
+    !,wam_inst(Code).
 
 
 wam_inst(unify_variable(AX)):-
-  unify_mode(read),!,
-  retract(reg_s(S)),
-  (retract(reg_ax(AX,_)) ; true),
-  heap(S,H_VALUE),
-  assert(reg_ax(AX,H_VALUE)),
-  S1 is S + 1,
-  assert(reg_s(S1)),
+    unify_mode(read),!,
+    retract(reg_s(S)),
+    (retract(reg_ax(AX,_)) ; true),
+    heap(S,H_VALUE),
+    assert(reg_ax(AX,H_VALUE)),
+    S1 is S + 1,
+    assert(reg_s(S1)),
 
-  retract(reg_p(N)),
-  code_area(N,_,Code),
-  N1 is N + 1,
-  assert(reg_p(N1)),
-  !,wam_inst(Code).
+    retract(reg_p(N)),
+    code_area(N,_,Code),
+    N1 is N + 1,
+    assert(reg_p(N1)),
+    !,wam_inst(Code).
 
 wam_inst(unify_variable(AX)):-
-  unify_mode(write),!,
-  retract(reg_h(H)),
-  H_VALUE = (ref,H),
-  set(heap(H,H_VALUE)),
-  (retract(reg_ax(AX,_)) ; true),
-  assert(reg_ax(AX,H_VALUE)),
-  H1 is H + 1, assert(reg_h(H1)),
+    unify_mode(write),!,
+    retract(reg_h(H)),
+    H_VALUE = (ref,H),
+    set(heap(H,H_VALUE)),
+    (retract(reg_ax(AX,_)) ; true),
+    assert(reg_ax(AX,H_VALUE)),
+    H1 is H + 1, assert(reg_h(H1)),
 
-  retract(reg_p(N)),
-  code_area(N,_,Code),
-  N1 is N + 1,
-  assert(reg_p(N1)),
-  !,wam_inst(Code).
+    retract(reg_p(N)),
+    code_area(N,_,Code),
+    N1 is N + 1,
+    assert(reg_p(N1)),
+    !,wam_inst(Code).
 
 wam_inst(proceed). % do nothing.
 
 
 % catch irregular pattern
 wam_inst(Other):-
-  writeln(not_impremented_wam_inst(Other)).
+    writeln(not_impremented_wam_inst(Other)).
 
 
 get_structure_case((ref,ADDR),F/N):-
-  retract(reg_h(H)),
-  H1 is H + 1,
-  set(heap(H,(str,H1))),
-  set(heap(H1,F/N)),
-  bind(ADDR,H),
-  H2 is H + 2,
-  assert(reg_h(H2)),
-  (retract(unify_mode(_)) ; true),
-  assert(unify_mode(write)).
+    retract(reg_h(H)),
+    H1 is H + 1,
+    set(heap(H,(str,H1))),
+    set(heap(H1,F/N)),
+    bind(ADDR,H),
+    H2 is H + 2,
+    assert(reg_h(H2)),
+    (retract(unify_mode(_)) ; true),
+    assert(unify_mode(write)).
 
 get_structure_case((str,ADDR),F/N):-
-  heap(ADDR,F/N),!,
-  (retract(reg_s(_)) ; true),
-  S is ADDR + 1,
-  assert(reg_s(S)),
-  (retract(unify_mode(_)) ; true),
-  assert(unify_mode(read)).
+    heap(ADDR,F/N),!,
+    (retract(reg_s(_)) ; true),
+    S is ADDR + 1,
+    assert(reg_s(S)),
+    (retract(unify_mode(_)) ; true),
+    assert(unify_mode(read)).
 
 % deref(A :register index, ADDR_V :value on HEAP)
 % deref(レジスタIndex,HEAP上の値(タグ,値))
