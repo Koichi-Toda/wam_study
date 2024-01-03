@@ -1,0 +1,90 @@
+#
+# Execution Result(L1)
+#
+# You can use swipl to exectute this L1 Language VM
+# https://www.swi-prolog.org/
+#
+
+
+$ swipl L1_compiler.pl
+Welcome to SWI-Prolog (threaded, 64 bits, version 8.2.4)
+SWI-Prolog comes with ABSOLUTELY NO WARRANTY. This is free software.
+Please run ?- license. for legal details.
+
+For online help and background, visit https://www.swi-prolog.org
+For built-in help, use ?- help(Topic). or ?- apropos(Word).
+
+?- prolog(p(f(X),h(Y,f(a)),Y),p(Z,h(Z,W),f(W))).
+:- dynamic code_area/3.
+
+code_area(0, p/3, get_structure(f/1, a:1)).
+code_area(1, _, unify_variable(x:4)).
+code_area(2, _, get_structure(h/2, a:2)).
+code_area(3, _, unify_variable(x:5)).
+code_area(4, _, unify_variable(x:6)).
+code_area(5, _, get_value(x:5, a:3)).
+code_area(6, _, get_structure(f/1, x:6)).
+code_area(7, _, unify_variable(x:7)).
+code_area(8, _, get_structure(a/0, x:7)).
+code_area(9, _, proceed).
+code_area(10, _, put_variable(x:4, a:1)).
+code_area(11, _, put_structure(h/2, a:2)).
+code_area(12, _, set_value(x:4)).
+code_area(13, _, set_variable(x:5)).
+code_area(14, _, put_structure(f/1, a:3)).
+code_area(15, _, set_value(x:5)).
+code_area(16, _, call(p/3)).
+
+:- dynamic reg_ax/2.
+
+reg_ax(a:1,  (ref, 0)).
+reg_ax(a:2,  (str, 2)).
+reg_ax(a:3,  (str, 6)).
+reg_ax(x:4,  (ref, 10)).
+reg_ax(x:5,  (ref, 0)).
+reg_ax(x:6,  (ref, 4)).
+reg_ax(x:7,  (ref, 13)).
+
+:- dynamic reg_h/1.
+
+reg_h(16).
+
+:- dynamic reg_p/1.
+
+reg_p(-1).
+
+:- dynamic store/2.
+
+store(1,  (str, 2)).
+store(2, h/2).
+store(3,  (ref, 0)).
+store(5,  (str, 6)).
+store(6, f/1).
+store(7,  (ref, 4)).
+store(8,  (str, 9)).
+store(9, f/1).
+store(0,  (ref, 8)).
+store(10,  (ref, 4)).
+store(11,  (str, 12)).
+store(12, f/1).
+store(4,  (ref, 11)).
+store(14,  (str, 15)).
+store(15, a/0).
+store(13,  (ref, 14)).
+
+true .
+
+?-
+
+# The pattern matching results for p(f(X),h(Y,f(a)),Y) and p(Z,h(Z,W),f(W)) should be...
+# Z = f(f(a)), Z = Y.
+# W = f(a), W = X.
+#
+# In this example,
+# You can find Z is  store(0, (ref,8))   = f(f(a)).
+# Also         W is  store(4, (ref, 11)) = f(a).
+#
+# The L1 language does not have a clearly defined mechanism to return the answer,
+# but the result can be obtained by observing the heap area (store() area in this example).
+# (The answer return mechanism will be defined in the final prolog implementation stage;
+# the L1 language is just a step in the process.)
