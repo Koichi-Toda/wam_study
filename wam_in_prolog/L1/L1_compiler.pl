@@ -8,7 +8,7 @@ prolog(Code,Query):-
     compile_query(Query,WAM_Query),
     functor(Code,F,A),
     wam((F/A,WAM_Code),WAM_Query),
-    listing([reg_ax,reg_h,reg_p,store]).
+    listing([code_area,reg_ax,reg_h,reg_p,store]).
 
 :- dynamic code_area/3, store/2.
 :- dynamic reg_h/1, reg_s/1, reg_p/1.
@@ -20,61 +20,60 @@ set(heap(ADDRESS,VALUE)):- assert(store(ADDRESS,VALUE)).
 reset(heap(ADDRESS,VALUE)):- retract(store(ADDRESS,VALUE)).
 heap(ADDRESS,VALUE):- store(ADDRESS,VALUE).
 
-
-
 wam((F/A,Code),Query):-
     assert(reg_h(0)),
+    assert(reg_p(0)),
     store_code(F/A,Code),
-    exec_query(Query).
+    store_query(Query),
+    wam_vm.
 
 % store wam code into CODE_AREA
 store_code(Label,[X|Z]):-
-    assert(code_area(0,Label,X)),
-    assert(reg_p(1)),
+    increment(reg_p(N)),
+    assert(code_area(N,Label,X)),
     store_code(Z).
 store_code([]).
 store_code([X|Z]):-
-    store_code_(X),
+    increment(reg_p(N)),
+    assert(code_area(N,_,X)),
     store_code(Z).
 
-store_code_(Code):-
-    retract(reg_p(N)),
-    assert(code_area(N,_,Code)),
-    N1 is N + 1,
-    assert(reg_p(N1)).
+% store wam query into CODE_AREA
+store_query(X):-
+    reg_p(N),
+    store_code(X),
+    redefine(reg_p(N)).
 
-exec_query([]).
-exec_query([X|Z]):-
-    exec_query_(X),
-    exec_query(Z).
-exec_query_(X):-
-    wam_inst(X).
+% looping (when register P is terminated(-1) should be stop)
+wam_vm :- reg_p(-1) ; wam_exec, wam_vm.
 
+wam_exec:-
+    increment(reg_p(N)),
+    code_area(N,_,Instraction),
+    !,wam_inst(Instraction).
+
+increment(reg_p(N)):- retract(reg_p(N)), N1 is N + 1, assert(reg_p(N1)).
+increment(reg_h(N)):- retract(reg_h(N)), N1 is N + 1, assert(reg_h(N1)).
+redefine(reg_p(N)):- retract(reg_p(_)), assert(reg_p(N)).
 
 %% WAM instuctions (for query)
 wam_inst(put_variable(x:X,a:A)):-
-    retract(reg_h(H)),
+    increment(reg_h(H)),
     H_VALUE = (ref, H),
     set(heap(H, H_VALUE)),
     assert(reg_ax(x:X, H_VALUE)),
-    assert(reg_ax(a:A, H_VALUE)),
-    H1 is H + 1,
-    assert(reg_h(H1)).
+    assert(reg_ax(a:A, H_VALUE)).
 
 wam_inst(set_variable(AX)):-
-    retract(reg_h(H)),
+    increment(reg_h(H)),
     H_VALUE = (ref, H),
     set(heap(H, H_VALUE)),
-    assert(reg_ax(AX, H_VALUE)),
-    H1 is H + 1,
-    assert(reg_h(H1)).
+    assert(reg_ax(AX, H_VALUE)).
 
 wam_inst(set_value(AX)):-
-    retract(reg_h(H)),
+    increment(reg_h(H)),
     reg_ax(AX, R_VALUE),
-    set(heap(H, R_VALUE)),
-    H1 is H + 1,
-    assert(reg_h(H1)).
+    set(heap(H, R_VALUE)).
 
 wam_inst(put_structure(F/A,AX)):-
     retract(reg_h(H)),
@@ -87,32 +86,19 @@ wam_inst(put_structure(F/A,AX)):-
     assert(reg_h(H2)).
 
 wam_inst(call(Label)):-
-    listing([reg_ax,reg_h,store,code_area]),
-    retract(reg_p(_)),
-    code_area(N,Label,FastCode),
+    code_area(N,Label,FirstInst),
     N1 is N + 1,
-    assert(reg_p(N1)),
-    !,wam_inst(FastCode).
+    redefine(reg_p(N1)),
+    !,wam_inst(FirstInst).
 
 
 %% WAM instructions (for program)
 wam_inst(get_structure(F/A,AX)):-
-    retract(reg_p(N)),
     deref(AX,ADDR_V),!,
-    get_structure_case(ADDR_V,F/A),
-    code_area(N,_,Code),
-    N1 is N + 1,
-    assert(reg_p(N1)),
-    !,wam_inst(Code).
+    get_structure_case(ADDR_V,F/A).
 
 wam_inst(get_value(X,A)):-
-    unify(X,A),
-    retract(reg_p(N)),
-    code_area(N,_,Code),
-    N1 is N + 1,
-    assert(reg_p(N1)),
-    !,wam_inst(Code).
-
+    unify(X,A).
 
 wam_inst(unify_variable(AX)):-
     unify_mode(read),!,
@@ -121,31 +107,18 @@ wam_inst(unify_variable(AX)):-
     heap(S,H_VALUE),
     assert(reg_ax(AX,H_VALUE)),
     S1 is S + 1,
-    assert(reg_s(S1)),
-
-    retract(reg_p(N)),
-    code_area(N,_,Code),
-    N1 is N + 1,
-    assert(reg_p(N1)),
-    !,wam_inst(Code).
+    assert(reg_s(S1)).
 
 wam_inst(unify_variable(AX)):-
     unify_mode(write),!,
-    retract(reg_h(H)),
+    increment(reg_h(H)),
     H_VALUE = (ref,H),
     set(heap(H,H_VALUE)),
     (retract(reg_ax(AX,_)) ; true),
-    assert(reg_ax(AX,H_VALUE)),
-    H1 is H + 1, assert(reg_h(H1)),
+    assert(reg_ax(AX,H_VALUE)).
 
-    retract(reg_p(N)),
-    code_area(N,_,Code),
-    N1 is N + 1,
-    assert(reg_p(N1)),
-    !,wam_inst(Code).
-
-wam_inst(proceed). % do nothing.
-
+% stop wam exec
+wam_inst(proceed):- redefine(reg_p(-1)).
 
 % catch irregular pattern
 wam_inst(Other):-
@@ -339,7 +312,7 @@ reg_match(unify_var(X)=V,(unify_var(X),V),VL,VL).
 reg_match(X,X,VL,VL).
 
 
-%% varuable assignment main part (firstry, all instaction command will build. and then adjust varuable assignment process.) 
+%% varuable assignment main part (firstry, all instaction command will build. and then adjust varuable assignment process.)
 var_assign([],[],VL,VL).
 var_assign([X|Y],[A|B],VL,VL__):-
     var_assign(X,A,VL,VL_),
