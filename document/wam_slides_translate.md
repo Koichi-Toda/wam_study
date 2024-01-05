@@ -1468,7 +1468,7 @@ M3では、M2の allocateの定義を変更する:
 3. 最後の節
 
   それぞれ・・・:  
-1. trey_me_else L  
+1. try_me_else L  
       新しい選択ポイントフレームをスタックにアロケートし、
       それを次の節のフィールドとして L に設定する。  
       そして、現在のコンテキストにおける他のフィールドは
@@ -1496,9 +1496,9 @@ M3では、すべてのM2命令が失敗する可能性がある
 最終的に失敗し、実行は異常終了する。  
 ```
     (考察:
-      ここで論じている backtrack は、前述の truse_me が失敗したときに、より深くバックトラック
+      ここで論じている backtrack は、前述の trust_me が失敗したときに、より深くバックトラック
       するために、呼び出し元の、述語の次の選択肢にまで、ジャンプするために行う操作と考える。
-      そう考えると、truse_me が失敗したときの動作に組み込まれている　のかな？と考えるが、
+      そう考えると、trust_me が失敗したときの動作に組み込まれている　のかな？と考えるが、
       詳細なコードも示されていないため、いま一つわからないところがある。
 
      　・・・wambookを読むと、そうではなく、tryme系の命令は、単純に選択ポイントの設定をしているだけ
@@ -1592,7 +1592,7 @@ M3では、すべてのM2命令が失敗する可能性がある
 ```
     P/n : try_me_else L1
     L1  : try_me_else L2
-    Lk-1: trey_me_else Lk
+    Lk-1: try_me_else Lk
     Lk  : trust_me
 ```
  各節は、M2の単一節L2と同じように翻訳される。
@@ -1606,11 +1606,11 @@ M3では、すべてのM2命令が失敗する可能性がある
 ```
   ＜サンプルコード＞
   ---
-  p/2: try_me_sle L1        % p
+  p/2: try_me_else L1        % p
        get_variable X3,A1   %  (X,
        get_structure a/0,A2 %     a)
        proceed              %       .
-  L1 : rety_me_else L2      % p
+  L1 : retry_me_else L2      % p
        get_structure b/0,A1 %  (b,
        get_variable X3,A2   %     X)
        proceed              %       .
@@ -1642,21 +1642,20 @@ VMの動作って・・・基本的に、まず最初にPを読んで、そこ�
 ## <a name="chapter4">4. 最適化 (Optimizing the Design) </a>
 
 
-##### WAM原理1
-　　ヒープスペースは、できる限り控えめに使用されるべきであり、ヒープ上に構築されたものは、相対的に永続的なものであるべきである。
+##### WAM原則1
+ヒープスペースは、できる限り控えめに使用されるべきであり、ヒープ上に構築されたものは、相対的に永続的なものであるべきである。
 
-##### WAM原理2
-　　レジスタは、不要なデータ移動を極力避けてアロケートされなければならないし、そしてコードサイズもまた極力最小化されるよう調整されるべきである。
+##### WAM原則2
+レジスタは、不要なデータ移動を極力避けてアロケートされなければならないし、そしてコードサイズもまた極力最小化されるよう調整されるべきである。
 
-##### WAM原理3
-　　（頻繁に発現する）特定の条件においては（仮に一般的なケースの命令処理においては、十分適切に制御されていたとしても）
-　　その特異性による恩恵で、スペースや時間を節約することができるのであれば、特別にその便宜を図るべきである。
+##### WAM原則3
+発生頻度の高い、特定の条件においては（仮に一般的なケースの命令処理において、十分適切に制御されていたとしても）
+その特異性によりもたらされる恩恵により、スペースや時間を節約することができるのであれば、特別にその便宜を図るべきである。
 
-
-
-### [Heap representation]
-より望ましい、ヒープの表現は以下となろう: (p(Z,h(Z,W),f(W))
+### [ヒープの最適化 Heap representation]
+ヒープにおける、より望ましいデータ配置は以下となろう
 ```
+(p(Z,h(Z,W),f(W))
    0|h/2  |
    1|REF|1|
    2|REF|2|
@@ -1667,11 +1666,11 @@ VMの動作って・・・基本的に、まず最初にPを読んで、そこ�
    7|STR|0|
    8|STR|3|
 ```
-　　ストアやレジスタからの参照は全て <STR,5> 形式のセルになっているが
-　　実のところ、各ファンクターセルの前に、定型的な STR セルを割り当てる必要性はないのである。
+ストアやレジスタからの参照は全て <STR,5> のセル形式になっている。
+
+しかし、各ファンクターセルに対して、その直前に定型的な STR セルを割り当てるということは、実のところ必要性はないのである。
 
 ```
--------------
 本文冒頭の Heap レイアウトを参考までに再掲載する・・・
 (p(Z,h(Z,W),f(W))
    0|STR|1|
@@ -1686,50 +1685,50 @@ VMの動作って・・・基本的に、まず最初にPを読んで、そこ�
    9|REF|2|
   10|STR|1|
   11|STR|5|
--------------
 ```
+
 このために必要なことは、put_structure 命令を次のように変更することだけである:
 ```
 put_structure f/n,Xi ≡ HEAP[H] ← f/n;
                        Xi ← <STR,H>;
                        H ← H + 1;
 ```
+
 ```
-------
 比較のために、元の定義を併記する。
 put_structure f/n,Xi ≡ HEAP[H] ← <STR,H+1>;
                        HEAP[H+1] ← f/n
                        Xi ← HEAP[H];
                        H ← H + 2;
-(Xiには、最適化後も同じように <STR,H> がセットされており、基本的なレジスタの使用方法には変更がないことが分かる)
-------
+(Xiには、最適化後は <STR,H> がセットされているが、双方とも f/nの位置をセットしていることに変わりはない)
 ```
+　
 
+### 【定数・リスト・無名変数(Constants,lists, and anonymous variables)】
 
-### Constants,lists, and anonymous variables
-
-##### Constants
-    unify_vafiable Xi
+#### [定数]
+    unify_variable Xi
     get_structure c/0,Xi
 
-これは、１つの特殊化された命令に単純化できる。  
+これを１つの特化した命令に単純化する  
 ```
-　　 unify_constant c  
+    unify_constant c  
 ```
 そして  
 ```
-    put_structure c/0,Xi  
-    set_variable Xi  
+put_structure c/0,Xi  
+set_variable Xi  
 ```
-もまた、単純化できる:  
+もまた、同じように単純化を行う  
 ```
     set_constant c  
 ```
 
-類似的に、put と get 命令もまた、定数の特別な取扱によって単純化できる
+同じように put と get 命令もまた、定数に特化することで単純化できる
 
-我々は、定数を識別するため、この種のデータセルに新たに'CON'タグを付与する必要がある。
-e.g., 構造体 f(b,g(a))を例にすると、アドレス10から始まる、ヒープ表現は以下となる:
+我々は、定数を識別するため、この種のデータセルに新たに「CON」タグを付与することにする。
+
+e.g., 構造体 f(b,g(a))を例にすると、ヒープ表現は以下となる(アドレス10から始まる)
 ```
     8|    g/1    |
     9| CON |  a  |
@@ -1737,8 +1736,22 @@ e.g., 構造体 f(b,g(a))を例にすると、アドレス10から始まる、�
    11| CON |  b  |
    12| STR |  8  |
 ```
-定数に対する、レジスタからのロードや、変数とのバインドするときの、Heap のスペースが軽減されることになる:
-これは、文字通りの値として取り扱われる。
+
+```
+訳註：上記ヒープ表現を従来の方法で表現すると以下のようになる
+    8|    g/1    |
+    9|    a/0    |
+   10|    f/2    |
+   11|    b/0    |
+   12| STR |  8  |
+一見さほど変化していないように見えるが、(0であるにも関わらず)引数個数のエリアが
+余計に必要であったのでその分は省スペース化される
+```
+
+
+この最適化は、定数に対するレジスタからのロードや、変数とのバインドをする際に、Heap のスペースを軽減することになる:
+
+これにより（定数は）、文字通りの値として取り扱われる。
 ```
 Constant-handling instructions:
 ・put_constant c,Xi
@@ -1746,66 +1759,1055 @@ Constant-handling instructions:
 ・set_constant c
 ・unify_constant c
 ```
-<コード定義は省略>
 
-Lists
+＜各命令の擬似コード＞
+```
+put_constant c,Xi ≡ Xi ← <CON,c>;
 
+get_constant ≡
+    addr ← deref(Xi);
+    case STORE[addr] of
+      <REF,_> : STORE[addr] ← <CON,c>;
+                trail(addr);
+      <CON,c'>: fail ← (c ≠ c');
+      other   : fail ← true;
+    endcase;
 
+set_constant c ≡ HEAP[H] ← <CON,c>;
+                 H ← H + 1;
 
+unify_constant c ≡
+    case mode of
+      READ : addr ← deref(S);
+             case STORE[addr] of
+               <REF,_> : STORE[addr] ← <CON,c>;
+                         trail(addr);
+               <CON,c'>: fail ← (c ≠ c');
+               other   : fail ← true;
+             endcase;
+      WRITE : HEAP[H] ← <CON,c>;
+              H ← H + 1;
+    endcase;
 
+```
+　
 
+#### [リスト]
+空でないリストならば、このリストのファンクター表現をヒープ上で明示的に格納する必要はないだろう。
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+（新たに）「LIS」タグを定義し、（この「LIS」タグを付与した）ヒープ上のセルにリスト・ペアの先頭アドレスが含まれていることを示すことにする。
 
 
+＜リスト制御命令の擬似コード＞
+```
+put_list Xi ≡ Xi ← <LIS,H>;
+
+get_list Xi ≡ addr ← deref(Xi);
+              case STORE[addr] of
+                <REF,_> : HEAP[H] ← <LIS,H+1>;
+                          bind(addr,H);
+                          H ← H + 1;
+                          mode ← WRITE;
+                <LIS,a> : S ← a;
+                          mode ← READ;
+                other   : fail ← true;
+             endcase;  
+```
+
+```
+＜クエリ例＞: ?-p(Z,[Z,W],f(W)).
+
+      put_list X5           % ?-X5 = [
+      set_variable X6       %         W|
+      set_constant []       %           []],
+      put_variable X4,A1    %   p(Z,
+      put_list A2           %       [
+      set_value X4          %        Z|
+      set_value X5          %          X5],
+      put_structure f/1,A3  %              f
+      set_value X6          %               (W)
+      call p/3              %                  ).
+```
+
+```
+＜プログラム例＞: p(f(X),[Y,f(a)],Y).
+
+p/3 : get_structure f/1,A1  %   p(f
+      unify_variable X4     %      (X,
+      get_list A2           %         [
+      unify_variable X5     %          Y|
+      unify_variable X6     %            X6],
+      get_value X5,A3       %                Y),
+      get_list X6           %   X6 = [
+      unify_variable X7     %         X7|
+      unify_constant []     %            []],
+      get_structure f/1,X7  %   X7 = f
+      unify_constant a      %         (a)
+      proceed               %            .
+
+```
+
+　
+#### [無名変数]
+引数変数でない位置の変数のうち、１度しか出現しない変数の場合は、レジスタ使用を省略できる。
+
+f(_, _, _) のように、いくつも連続して発生する無名変数の場合、これらを一挙に処理することができる。
+
+無名変数に関する各種命令：
+- set_void n
+
+    ヒープに、未バインドのREFセルをn個プッシュする
+- unify_void n
+
+    WRITEモードでは、set_void n; のようにふるまう
+
+    READモードでは、次の n 個のヒープセルをスキップし、Sの位置から開始する
+
+<擬似コード>
+```
+set_void ≡ for i ← H to H+n-1 do
+             HEAP[i] ← <REF,i>;
+           H ← H + n;
+
+unify_void n ≡ case mode of
+                 READ  : S ← S + n;
+                 WRITE : for i ← H to H+n-1 do
+                           HEAP[i] ← <REF,i>;
+                         H ← H + n;
+               endcase
+```
+NOTE: 無名の先頭引数は、単純に無視される
+
+    get_variable Xi,Ai
+
+の変数Xiは明らかに空だからである
+
+```
+<ファクトp(_,g(X),f(_,Y,_)).のプログラム例>
+
+p/3 : get_structure g/1,A2  %  p(_,g
+      unify_void 1          %       (X),
+      get_structure f/3,A3  %           f
+      unify_void 3          %            (_,Y,_)
+      proceed               %                   ).
+```
+
+　
+#### [レジスタ割当て]
+巧みなレジスタ割り当てにより、peep-hole 最適化を可能とする
+
+e.g., ファクト conc([],L,L,).の場合のコード例:
+```
+conc/3 : get_constant [],A1  % conc([],
+         get_variable X4,A2  %         L,
+         get_value X4,A3     %           L)
+         proceed             %             .
+```
+このコードの中で、変数Lのために X4を使用することは馬鹿げている：A2を使おう！
+
+⇨ get_variable A2,A2 は無意味なオペレーションなので、省略できる：
+```
+conc/3 : get_constant [],A1  % conc([],
+         get_value A2,A3     %         L,L)
+         proceed             %             .
+```
+一般的に、レジスタ同士のアロケーションは、意味のないオペレーションである。
+
+    get_variable Xi,Ai  put_value Xi,Ai
+
+これらは省略できる
+
+([2]を参照のこと）
+```
+プログラム例: p(X,Y) :- q(X,Z),r(Z,Y).
+
+p/2 : allocate 2         % p
+      get_variable X3,A1 %  (X,
+      get_variable Y1,A2 %     Y):-
+      put_value X3,A1    %          q(X,
+      put_variable Y2,A2 %              Z
+      call q/2           %               ),
+      put_value Y2,A1    %          r(Z,
+      put_value Y1,A2    %              Y
+      call r/2           %               )
+      deallocate         %                .
+```
+
+```
+レジスタ割付を改善したプログラム例: p(X,Y) :- q(X,Z),r(Z,Y).
+
+p/2 : allocate 2         % p
+      get_variable Y1,A2 %  (X,Y):-
+      get_variable Y2,A2 %          q(X,Z
+      call q/2           %               ),
+      put_value Y2,A1    %          r(Z,
+      put_value Y1,A2    %              Y
+      call r/2           %               )
+      deallocate         %                .
+```
+
+　
+#### [末尾最適化]
+末尾最適化(LCO)は、（スタックフレームのリカバリプロセスとしての）テイル・リカージョン最適化の一般化である。
+
+アイデア：permanent 変数は、ボディ内の最後の呼び出しの手前で、（かつ）すべてのput命令が実行された後では、もはや必要とされない。
+
+⇨ ルール本体の最後の呼び出しの「前」に、現在の環境を破棄しよう
+
+単純に： ルールの命令シーケンスの最後の call, deallocate の順番を入れ替えるだけだ
+（i.e.,つまり deallocate, call）。
+
+注意：deallocate はもはや最後の命令とはならない。このため、PではなくCPをリセットしなければならない：
+```
+deallocate ≡ CP ← STACK[E+1];
+             E ← STACK[E];
+             P ← P + instruction_size(P)
+```
+
+注意：しかし call が最後の命令となる場合は、CPではなく、Pをリセットしなければならない：
+
+でも、最後でない場合の call の動作は正しいので、我々は call 自体を改変することはできない
+
+call が最後の命令となる場合のために、execute p/n を使用することとしよう:
+```
+<擬似コード>
+execute p/n ≡ P ← @(p/n);
+```
+
+```
+LCO対策済みのコード例: P(X,Y) :- q(X,Z),r(Z,Y).
+
+p/2 : allocate 2         %  p
+      get_variable Y1,A2 %   (X,Y) :-
+      put_variable Y2,A2 %            q(X,Z
+      call q/2           %                 ),
+      put_value Y2,A1    %            r(Z,
+      put_value Y1,A2    %                Y
+      deallocate         %                 )
+      execute r/2        %                  .
+```
+
+　
+#### [チェインルール]
+
+以下のようなチェインルールの形式に対してLCOを適用してみる
+```
+p(...) :- q(...).
+```
+以下が与えられる:
+```
+p : allocate N
+    get arguments of p
+    put arguments of q
+    deallocate
+    execute q
+```
+しかし、チェインルール内の全ての変数は、必然的に temporary 変数である
+
+⇨ LCOを適用すると allocate/deallocate はチェインルールの中では不要となる ー これらを削除しよう！
+
+i.e., 以下の形式のチェインルールを翻訳しなおす
+```
+p(...) :- q(...).
+```
+このように：
+```
+p : get arguments of p
+    put arguments of q
+    execute q
+```
+チェインルールでは、スタックフレームは全く不要である！
+
+　
+#### [環境フレームの刈り込み(Environment trimming EL)]
+LCOを徹底する：permanent 変数が不要になり次第直ちに破棄する
+
+⇨ 現在の環境フレームを漸次削減し、最終的には、LCOによって完全に消滅するようにする
+
+ルールのPV(permanent変数)をランク付けして、PVの最終ゴールが遅いほど、現在の環境フレームのオフセットが小さくなるようにする
+
+e.g., 以下において
+```
+p(X,Y,Z) :- q(U,V,W),r(Y,Z,U),s(U,W),t(X,V).
+```
+全ての変数は permanentである：
+```
+    | Variable | Last goal | Offset |
+    |    X     |     t     |   Y1   |
+    |    Y     |     r     |   Y5   |
+    |    Z     |     r     |   Y6   |
+    |    U     |     s     |   Y3   |
+    |    V     |     t     |   Y2   |
+    |    W     |     s     |   Y4   |
+```
+これからは、call は call後もなお必要とされる PVの数をカウントする第2引数を取ることとする
+
+
+注意：常に正しい stack オフセットを反映するように allocate の動作を修正すること
+
+事実：環境のCPフィールドであるSTACK[E + 1]には常に、call P,N（Nは希望のオフセット）の直後の命令アドレスが含まれる。
+
+⇨ allocate はもはや引数を必要としなくなり、環境はオフセットフィールドを必要としなくなった
+
+```
+E  |  CE (continuation environment) |
+E+1|  CP (continuation point)       |
+E+2|  Y1 (permanent variable 1)     |
+   |              :                 |
+```
+　
+
+CODE[STACK[E+1] 1] として適切に刈り込まれたオフセットを取得するように、allocateを変更する：
+```
+allocate ≡
+     if E > V
+       then newE ← E + CODE[STACK[E+1] - 1] + 2
+       else newE ← B + STACK[B] + 7;
+     STACK[newE] ← E;
+     STACK[newE+1] ← CP;
+     E ← newE;
+     P ← P + instruction_size(P);
+
+( try_me_elseに類似する。。。）
+```
+
+```
+環境フレームを最適化したコード：
+
+p/3 : allocate           % p
+      get_variable Y1,A1 %  (X,
+      get_variable Y5,A2 %     Y,
+      get_variable Y6,A3 %       Z) :-
+      put_variable Y3,A1 %             q(U,
+      put_variable Y2,A2 %                 V,
+      put_variable Y4,A3 %                   W
+      call q/3,6         %                    ),
+      put_value Y5,A1    %             r(Y,
+      put_value Y6,A2    %                 Z,
+      put_value Y3,A3    %                   U
+      call r/3,4         %                    ),
+      put_value Y3,A1    %              s(U,
+      put_value Y4,A2    %                  W
+      call s/2,2         %                   ),
+      put_value Y1,A1    %              t(X,
+      put_value Y2,A2    %                  V
+      deallocate         %                   )
+      execute t/2        %                    .
+```
+　
+
+#### [スタック変数]
+ゴール引数としてルール本体に最初に現れるpermanent変数である Ynは、put_variable Yn,Ai 命令で初期化される。
+
+これにより、Ynと引数レジスタAiの両方がヒープ上の新しいセルを指すように体系的に設定される。
+
+⇨ put_variable 命令を permanent変数 の場合とtemporary変数 の場合とで異なる動作をするように変更し、
+temporary変数 の場合はヒープセルを割り当てるところ、permanent変数 の場合はこれを行わないようにする。
+
+i.e.,
+```
+put_variable Yn,Ai ≡
+      addr ← E+n+1;
+      STACK[addr] ← <REF,addr>
+      Ai ← STACK[addr];
+```
+
+残念なことに、この一見無害に見える変更には、ETとLCOを妨げるという、かなり危険な影響がある。
+
+　
+##### トラブル
+permanent変数が（LCOとETによって）未拘束のまま廃棄される可能性がある。
+
+⇨ 危険：参照先が宙に浮いた状態（未保証となる）危険性がある！
+
+e.g.,
+- バインドされていない2つの変数の間で、バインドが任意のポインタ方向を選択するのは正しくない。
+- 今や、いくつかの命令は、特定の状況で盲目的に使用された場合、不適切となる可能性がある：
+put_value と set_value 命令など （このことは、WRITEモード時の unify_value でも起こり得る）
+
+　
+##### 対策
+- バインディング規約を順守する
+- put_value、set_value、unify_valueで何が問題なのかをオンザフライで分析し ・・・ 本当に必要なときだけ回避する
+
+　
+#### [変数バインディングとメモリレイアウト]
+
+結局のところ、ほとんどの適切な変数バインディングは、単純な時系列参照ルールに従えば確実に行える：
+
+　
+##### WAMバインディングルール1
+　　常に、アドレスの大きい変数がアドレスの小さい変数を参照するようにする。
+
+言い換えれば、古い（最近作られていない）変数は若い（より最近作られた）変数を参照できない。
+
+　
+##### WAMバインディングルール1の利点
+変数-変数間のバインディングには、以下の３つの可能性がある
+
+（１）ヒープ - ヒープ
+
+（２）スタック - スタック
+
+（３）ヒープ - スタック
+
+　
+- ケース（１）：無条件のバインディングは、条件付きのバインディングよりも優遇する：
+⇨ トレイルの必要がない
+⇨ バックトラック時に素早くヒープ領域を回復できる
+- ケース（２）：同じく適用されるが、環境内の環境フレーム刈込(ET)のpermanent変数(PV)ランキングでも一貫して機能する。
+残念なことに、参照が宙に浮く危険性をすべて防ぐには不十分である
+- ケース（３）：スタックへの参照は安全ではない；このため以下の追加ルールが必要である
+##### WAMバインディングルール2
+　ヒープ変数は決してスタックへの参照に設定してはならない；
+
+また、特定のメモリレイアウトの規則に従うことで、WAMのバインディングルール1との整合性を保つことができる：
+##### WAMバインディングルール3
+　スタックは、同じグローバルアドレス空間内で、ヒープよりも高いアドレスに割り当てられなければならない
+
+　
+#### [安全ではない変数]
+
+　
+##### 未だに残る課題
+「WAMバインディングルール2」は未だに put_value、set_value、unify_value で問題を引き起こす可能性がある。
+
+put_variable によって初期化されたPV（すなわち、ボディゴールの引数として最初に出現したPV）は、unsafeと呼ばれる。
+
+e.g.,以下について
+```
+p(X) :- q(Y,X), r(Y,X).
+```
+XとYはどちらも permanent変数(PV)だが、Yのみ、unsafeである
+
+述語 p が未束縛の引数とともに呼び出されたと仮定しよう
+
+e.g.,
+```
+put_variable Xi,A1
+execute p/1
+```
+
+安全でないコード p(X) :- q(Y,X),r(Y,X).
+```
+<0> p/1 : deallocate         % p
+<1>       get_variable Y1,A1 %  (X) :-
+<2>       put_variable Y2,A1 %         q(Y,
+<3>       put_value Y1,A2    %             X
+<4>       call q/2,2         %              ),
+<5>       put_value Y2,A1    %         r(Y,
+<6>       put_value Y1,A2    %             X
+<7>       deallocate         %              )
+<8>       execute r/2        %               .
+```
+0 行目の前に、A1はヒープの一番上にある未束縛のREFセルのヒープアドレス（仮に36としておこう）を指している：
+
+
+```
+(A1) | REF | 36 |              HEAP
+                           |          |
+                        36 | REF | 36 |
+                           |          |
+```
+次に、allocateはスタック上に環境を作る（例えば、Y1はスタックのアドレス77に、Y2はアドレス78にある）：
+
+```
+(A1) | REF | 36 |              HEAP
+                           |          |
+                        36 | REF | 36 |
+                           |          |
+
+                               STACK
+                           |          |
+                   (Y1) 77 |          |
+                   (Y2) 78 |          |
+                           |          |
+```
+1行目の命令で、STAK[77]に <REF,36> をセットし、
+2行目の命令で、A1(とSTACK[78]) に <REF,78> をセットする
+
+```
+(A1) | REF | 78 |              HEAP
+                           |          |
+                        36 | REF | 36 |
+                           |          |
+
+                               STACK
+                           |          |
+                   (Y1) 77 | REF | 36 |
+                   (Y2) 78 | REF | 78 |
+                           |          |
+```
+3行目の命令で A2に STACK[77] の値をセットするが
+これは <REF,36> である
+```
+(A1) | REF | 78 |              HEAP
+                           |          |
+                        36 | REF | 36 |
+                           |          |
+
+(A2) | REF | 36 |              STACK
+                           |          |
+                   (Y1) 77 | REF | 36 |
+                   (Y2) 78 | REF | 78 |
+                           |          |
+```
+ここで、4行目のqの呼び出しがこれらの設定にまったく影響を与えないと仮定する（例えばファクト q(_ ,_) が定義されているとする）
+
+つぎに、(誤った)5行目では、A1に <REF,78> をセットし、6行目では、A2に <REF,36> をセットする：
+```
+(A1) | REF | 78 |              HEAP
+                           |          |
+                        36 | REF | 36 |
+                           |          |
+
+(A2) | REF | 36 |              STACK
+                           |          |
+                   (Y1) 77 | REF | 36 |
+                   (Y2) 78 | REF | 78 |
+                           |          |
+```
+
+その次に、deallocate によって STACK[77] と STACK[78] を捨てる
+```
+(A1) | REF | 78 |              HEAP
+                           |          |
+                        36 | REF | 36 |
+                           |          |
+
+(A2) | REF | 36 |              STACK
+                           |          |
+                   (Y1) 77 |    ???   |
+                   (Y2) 78 |    ???   |
+                           |          |
+```
+なんと！プログラム r から参照する A1 のアドレスは既にゴミ箱に入っている
+
+　
+#### [安全ではない変数の救済]
+
+最後のゴールで安全でない変数Ynが発生する状況としては、2つのケースが考えられる：
+- Ynが最後のゴールの引数としてのみ現れる
+- Ynが（引数であるか否かにかかわらず）構造体の中に入れ子になったゴールの中に現れる
+
+
+2つ目のケースについては、（後述する）より一般的な安全性の欠如が原因と考えられる
+
+安全でないYnの出現がすべて、Ynが現れる最後のゴールの引数である場合、それらはすべてYn Aiの値に置かれる
+
+そして、その最後のゴール中 put_value Yn,Ai 命令のうち最初のものを、put_unsafe_value Yn,Ai 命令に置き換える
+
+put_unsafe_value Yn,Ai は put_value Yn,Ai を次のように修正する：
+- Ynが現在の環境フレームで未束縛の変数に接続しない場合は、put_value Yn,Aiを実行する
+- そうでなければ、スタック変数をヒープ上の新しい未束縛のREFセルにバインドし、Aiをそれにセットする
+```
+  put_unsafe_value Yn,Ai ≡
+      addr ← deref(E+n+1);
+      if addr < E
+        then Ai ← STORE[addr]
+        else
+          begin
+            HEAP[H] ← <REF,H>;
+            bind(addr,H);
+            Ai ← HEAP[H];
+            H ← H + 1
+          end;
+```
+例に戻る：
+
+行5が put_unsafe_value Y2,A1 だとすると、HEAP[37]が作成され <REF,37> をセットする
+
+STACK[78] と A1 に <REF,37> をセットし、そして A2 に <REF,36>（STACK[77]の値）をセットする：
+```
+(A1) | REF | 37 |              HEAP
+                           |          |
+                        36 | REF | 36 |
+                        37 | REF | 37 |
+                           |          |
+
+(A2) | REF | 36 |              STACK
+                           |          |
+                   (Y1) 77 |    36    |
+                   (Y2) 78 |    37    |
+                           |          |
+```
+STACK[77]とSTACK[78]を破棄しても、こんどは rを実行すればA1とA2から正しい値が得られるので、安全性を確保できている
+　
+#### [ネストしたスタック参照]
+安全でない permanent変数(PV)が構造体の最後のゴールに入れ子になっている（つまり、set_valueやunify_valueとして）場合、
+それは temporary変数(TV)にも影響する可能性のある、より一般的な問題を反映している
+
+例えば
+```
+Rule: a(X) :- b(f(X)).
+
+          a/1 : get_variable X2,A1
+                put_structure f/1,A1
+                set_vale X2
+                execute b/1
+
+Query: ?-a(X),...
+
+                allocate
+                put_variable Y1,A1
+                call a/1,1
+                         :
+```
+a1を呼び出す前に、Y1を含むスタックフレームがアロケートされ、put_variable Y1,A1 によってunboundに初期化される：
+```
+(A1) | REF | 82 |
 
 
 
 
 
+                               STACK
+                           |          |
+                   (Y1) 82 | REF | 82 |
+                           |          |
+```
+そして、X2に対してそのスタックのスロット（A1の値）を参照するようセットし、
+ファンクタ f/1 をヒープ上にプッシュし、set_value X2 命令により X2 の値をヒープ上にプッシュする：
+```
+(A1) | REF | 57 |              HEAP
+                           |          |
+                        57 |   f/1    |
+                        58 | REF | 82 |
+                           |          |
+
+(X2) | REF | 82 |              STACK
+                           |          |
+                   (Y1) 82 | REF | 82 |
+                           |          |
+```
+ヒープからスタックに参照している！
+
+この行為は「WAMバインディングルール2」に違反しており、Y1が最終的に廃棄される際に災いの種子となる
 
 
+　
+#### [ネストしたスタック参照の救済]
+##### 質問：
+set_value（各unify_value）が、不要なヒープからスタックへの参照を生成しないであろうと、確実に保証できるのはどのタイミングですか？
+##### 答え：
+その引数が、指定された節でヒープ上にあるように明示的に初期化されていない場合はいつでも
+
+すなわち、set_value Vn (各unify_value Vn)は、変数Vnがその節内で set_variable または unify_variable で初期されていない場合、あるいは Vn が temporary変数なのに put_variable で初期化されていない場合は、常に安全ではない
+
+##### 救済：
+最初の set_value命令(各 unify_value)
+を、set_local_value(各 unify_local_value)に置き換える
+
+```
+set_local_value Vn ≡
+      addr ← deref(Vn);
+      if addr < H
+        then HEAP[H] ← HEAP[addr]
+        else
+          begin
+            HEAP[H] ← <REF,H>;
+            bind(addr,H)
+          end;
+        H ← H + 1;
+```
+例に戻る：
+
+もし set_local_value X2 により set_value X2 を置き換えることができれば、X2の値がスタック・アドレスであることを検知し、ヒープ上の新しい未束縛セルにバインドすることができる
+```
+(A1) | STR | 57 |              HEAP
+                           |          |
+                        57 |   f/1    |
+                        58 | REF | 58 |
+                           |          |
+
+(X2) | REF | 58 |              STACK
+                           |          |
+                   (Y1) 82 | REF | 82 |
+                           |          |
+```
+これによりスタックからヒープへの参照が維持され、「WAMバインディングルール2」が尊重される
 
 
+　
+#### [変数分類の再検討]
+NOTE：実はparmanent変数(PV)とは単に従来のローカル変数（スタック上に確保されたもの）であるにすぎない
 
 
+David H. D. Warrenによれば
+- まず、すべての変数をPVとして考えよう
+- 次に、既に前のデータで初期化されているもの、ヒープ上に存在する構造体の一部であるもの、LCOのためにグローバル化する必要があるもの・・・をTV(temporary変数)と呼び、スタック・スペースを節約しよう
+
+　
+##### Warren の変数分類：
+- temporary変数とは、複数のボディ・ゴール（ヘッドは最初のボディ・ゴールの一部と数える）に出現せず、最初にヘッド、構造体、または最後のゴールに出現する変数のことである
+- parmanent変数とは、temporaryでない変数のことである
+
+NOTE:
+- 我々の分類でも Warren の分類でも、複数のボディゴールに出現する変数はparmanent変数(PV)である
+- しかし Warren の分類では、PVは1つのボディゴールにのみ発生する場合でも起こり得ることになる
+
+例えば以下の場合、我々の定義によると X は TV である：
+```
+a　:-　b(X,X), c.
+```
+しかし Warren の分類では PV となる
+
+　
+##### 問題：
+ウォーレンの変数分類は、実行時の安全チェックをしたとしても、環境トリミングとの整合性がとれない
+
+以下において、もしも X が PV ならば：
+```
+a　:-　b(X,X), c.
+```
+
+これは、以下のようにコンパイルされる；
+```
+a/0 : allocate               % a :-
+      put_variable Y,A1      %     b(X,
+      put_unsafe_value Y1,A2 %         X
+      call b/2,0             %          ),
+      deallocate             %     c
+      execute c/0            %      .
+```
+これは安全でないコードである
+- Y1 は、STACKにアロケートされている
+- A1 は、Y1の内容をセットされている
+- Y1 は、unsafe であり、グローバライズされなければならない:
+  Y1 と A2 を、新しいヒープ・セルへと参照するようにセットする
+- Y1 は 環境刈込(ET)によって破棄される
+- call b/2 で用いる A1 は、未だに破棄されたスロットを参照している！
+
+##### 解決策：
+そのようなPVの環境刈込(ET)の実行は、次の call まで遅延させる
+```
+a :- b(X,X),c. 刈込の遅延対策後
+
+a/0 : allocate           % a :-
+      put_variable Y1,A1 %      b(X,
+      put_value Y1,A2    %          X
+      call b/2,1         %           ),
+      deallocate         %      c
+      execute c/0        %       .
+```
+すなわち、Y1は b/2 の実行が完了するまで環境に保持され、その後破棄される
+
+　
+#### [インデキシング]
+節の選択処理を高速化するために、WAMは最初の引数をインデックスキーとして使用する
+
+NOTE: プロシージャの定義において、先頭に変数キーを持つ節は選択処理のボトルネックとなる
+⇨ プロシージャ p は、一連の節によって定義されている
+```
+C1,...,Cn
+```
+また、これらは、一連のサブシーケンスにより分割されている
+```
+S1,...,Sm
+```
+ここで各 Si は
+- 変数キーを持つ単一節であるであるか、
+- キーが変数ではない連続する節の最大のサブシーケンスであるか、のどちらかである
+
+```
+S1
+    call(X or Y) :- call(X).
+    call(trace) :- trace.
+    call(X or Y) :- call(Y).
+    call(notrace) :- notrace.
+    call(nl) :- nl.
+
+S2
+    call(X) :- buildin(X).
 
 
+S3
+    call(X) :- extern(X).
 
 
+S4
+    call(call(X)) :- call(X).
+    call(repeat).
+    call(repeat) :- call(repeat).
+    call(true).
+```
+　
+
+定義が S1,...,Sm に分割された手続き p のためのコンパイルスキーム(ここで m>1 である)：
+```
+p  : try_me_else S2
+     code for subsequence S1
+S2 : retry_me_else S3
+     code for subsequence S2
+               :
+Sm : trust_me
+     code for subsequence Sm
+
+(ここで retry_me_else は m > 2 の場合に限る)
+```
+なお m = 1の場合は、上記の対応は不要であり、単一のサブシーケンスのチャンクに必要なコードだけに翻訳される
+縮退したサブシーケンス（すなわち、変数キーが１つだけの節）の部分の翻訳は通常通りである。
+```
+call/1 : try_me_else S2      %
+         indexed code for S1 %
+S2     : retry_me_else S3    %  call(X)
+         execute builtin/1   %          :- builtin(X).
+S3     : retry_me_else S4    %  call(X)
+         execute extern/1    %          :- extern(X).
+S4     : trust_me            %
+         indexed code for S4 %
+```
+
+　
+#### [縮退しないサブシーケンスのインデキシング]
+一般的なインデキシングのコードパターン：
+```
+第1レベルインデキシング
+第2レベルインデキシング
+第3レベルインデキシング
+節をサブシーケンスの順に並べたコード
+```
+ここで
+- 第2レベルと第3レベルは、サブシーケンスに どのような種類のキー が いくつ存在するか によってのみ要不要が判断される
+- これらは 縮退時には必要とされない
+- 以下のディスパッチ・コードは、通常の逐次選択制御の構築である
+
+第1レベルのディスパッチは、deref(A1)があるか否かによって、
+制御を節の（おそらくvoidな）まとまりにジャンプさせる：
+- 変数
+
+　　　変数のコードのまとまりは、そのサブシーケンスの逐次探索に完全に対応する（従って、決して無効にはならない）
+- 定数
+
+　　　定数のコードのまとまりは、定数どうしの第2レベル・ディスパッチに対応する
+- リスト（空でない）
+
+　　　リストのコードのまとまりに対応する：
+
+　　　- リストのキーを伴う単一の節にリンクするか、
+
+　　　- さもなければ、キーがリストである部分節のすべての節のリンクドリストにリンクする
+
+- 構造体
+
+　　　構造体のコードのまとまりは、構造体どうしのの第2レベルのディスパッチに対応する
+
+複数の節を持つ定数(または構造体)については、第3レベルのまとまりが、これらの節のリンクドリストに対応する可能性がある(リストの第2レベルと同じように)
+```
+第1レベルインデキシング(for S1)
+第2レベルインデキシング(for S1)
+第3レベルインデキシング(for S1)
+
+S11 : try_me_else S12
+      code for 'call(X or Y) :- call(X).'
+S12 : retry_me_else S13
+      code for 'call(trace) :- trace.'
+S13 : retry_me_else S14
+      code for 'call(X or Y) :- call(Y).'
+S14 : retry_me_else S15
+      code for 'call(notrace) :- notrace.'
+S15 : trust_me
+      code for 'call(nl) :- nl.'
+```
+
+　
+#### [インデキシング命令]
+
+第1レベルのディスパッチング：
+- switch_on_term V,C,L,S
+
+　deref(A1)の結果がそれぞれ、変数、定数、空でないリスト、構造体のどれであるかによって、
+V、C、L、Sとラベル付けされた命令にそれぞれジャンプする
+
+　
+第2レベルのディスパッチング： N個の異なるシンボルに対して
+- switch_on_constant N,T
+
+　(Tは {ci: Lci}形式のハッシュテーブルである(i=1〜N))
+
+　もしderef(A1)=ciなら、Lciとラベル付された命令にジャンプするか、
+さもなければバックトラックする
+- switch_on_structure N,T
+
+　(Tは {si: Lsi}形式のハッシュテーブルである(i=1〜N))
+
+　もしderef(A1)=siなら、Lsiとラベル付された命令にジャンプするか、
+さもなければバックトラックする
+
+　
+#### 第3レベルインデキシング：
+以下を使用して キーがリスト、または同じ定数や構造体である、複数の（必ずしも連続しない）
+節のシーケンスをスレッドにまとめる：
+- try L,
+- retry L,
+- trust L.
+
+これらはそれぞれ、try_me_else L、retry_me_else L、trust_meと同じであるが、ラベルLにジャンプし、次の命令を選択ポイントの次の節の選択肢として保存する点が異なる（もちろん、trustを除く）
+
+NOTE: リストに対する第2レベルは、リスト構造に対する第3レベルのインデックスであり、第2レベルは「WAM原則3」（第4章[最適化]の冒頭で掲載された３つめの原則）の精神に基づきリストの特別な処理を施すことによってスキップされる
 
 
+```
+indexing code for subsequence S1
+
+      switch_on_term S11,C1,fail,F1           %  1st level dispatch for S1
+C1  : switch_on_constant 3,{ trace   : S1b,   %  2nd level for constants
+                             notrace : S1d,
+                             nl      : S1e }
+F1  : switch_on_structure 1,{ or/2 : F11 }    %  2nd level for structures
+F11 : try S1a                                 %  3rd level for or/2
+      trust S1c                               %
+
+S11 : try_me_else S12                         %  call
+S1a : get_structure or/2,A1                   %      (or
+      unify_variable A1                       %         (X,
+      unify_void 1                            %            Y))
+      execute call/1                          %       :- call(X).
+
+S12 : retry_me_else S13                       %  call
+S1b : get_constant trace,A1                   %      (trace)
+      execute trace/0                         %       :- trace.
+
+S13 : retry_me_else S14                       %  call
+S1c : get_structure or/2,A1                   %      (or
+      unify_void 1                            %         (X,
+      unify_variable A1                       %            Y))
+      execute call/1                          %        :- call(Y).
+
+S14 : retry_me_else S15                       %  call
+S1d : get_constant notrace,A1                 %      (notrace)
+      execute notrace/0                       %        :- notrace.
+
+S15 : trust_me                                %  call
+S1e : get_constant nl,A1                      %      (nl)
+      execute nl/0                            %       :- nl.
+```
 
 
+```
+indexing code for subsequence S4
+
+S4     switch_on_term S41,C4,fail,F4           %  1st level dispatch for S4
+C4   : switch_on_constant 3,{ repeat: C41,     %  2nd level for constants
+                              true  : S4d }
+F4   : switch_on_structure 1,{ call/1 : S41 }  %  2nd level for structures
+C41  : try S4b                                 %  3rd level for 'repeat'
+       trust S4c                               %
+
+S41  : try_me_else S42                         %  call
+S4a  : get_structure call/1,A1                 %      (call
+       unify_variable A1                       %           (X))
+       execute call/1                          %       :- call(X).
+
+S42  : retry_me_else S43                       %  call
+S4b  : get_constant repeat,A1                  %      (repeat)
+       proceed                                 %              .
+
+S43  : retry_me_else S44                       %  call
+S4c  : get_constant repeat,A1                  %      (repeat)
+       put_constant repeat,A1                  %       :- call(repeat)
+       execute call/1                          %                      .
+S44  : trust_me                                %  call
+S4d  : get_constant true,A1                    %      (true)
+       proceed                                 %            .
+```
+conc([],L,L).
+
+conc([H|T],L,[H|R]) :- conc(T,L,R).
+```
+Encoding of conc/3
+
+conc/3 : switch_on_term C1a,C1,C2,fail  %
+
+C1a    : try_me_else C2a                %  conc
+C1     : get_constant [],A1             %      ([],
+         get_value A2,A3                %          L,L)
+         proceed                        %              .
+C2a    : trust_me                       %  conc
+C2     : get_list A1                    %      ([
+         unify_variable X4              %        H|
+         unify_variable A1              %          T],L,
+         get_list A3                    %               [
+         unify_value X4                 %                H|
+         unify_variable A3              %                  R])
+         execute conc/3                 %      :- conc(T,L,R).
+```
+
+もしも conc/3 がインスタンス化された第1引数と共に呼び出されたときは、
+そのために選択ポイントフレームを用意する必要性はない
+
+実際、選択処理の高速化に付随して、インデックス作成にはセレンディピティ（偶然の出会い）的な大きなメリットがある：
+- これにより、選択点フレームの作成と操作が大幅に軽減される
+- 無駄な環境保護を省略できる
+- LCOとETの効果を増幅させる
+
+　
+#### [カット]
+#### ! :
+成功すると、この手続きに代わる可能性のある他のいかなる選択肢も、
+先行するボディ・ゴールから生じる他のいかなる選択肢も忘却する
+
+つまり、この手順を呼び出す直前に現在の選択点の後に作られた選択点はすべて破棄する
+
+#### 【Backtrack Cut Register: BC】
+
+　　BCは、カットした箇所をバックトラックで戻る際に チョイス・ポイントを保持する。
+
+BCには、手続き呼び出しが行われた時点で、最新のチョイス・ポイントのアドレスが保持されていなければならない：
+
+⇨ 現在の B に対して BC の値をセットすることで、call や execute の挙動を変更する
+
+⇨ cut により B を BC の値にリセットすることになる
+
+(NOTE: BC は、チョイス・ポイントの一部として保存され、バックトラック時に復元されなければならない)
+
+cutには２種類ある：
+- 浅い（あるいはネック）カット
+```
+h :- !,b1,...,bn.
+```
+- ディープカット
+```
+h :- ...,bi,!,...,bn. (1 ≦ i ≦ n)
+```
 
 
-＜＜＜＜ TO BE CONTINE ＞＞＞＞
+　
+### ネックカット
+- neck_cut
+Bに続くすべて（実際には1つまたは2つの）チョイス・ポイントを破棄する
+`(つまり B ← BC, HB ← B.H)`
+
+```
+例えば
+        a :- !,b.
+
+は、以下のようにコンパイルされる
+
+        neck_cut
+        execute b/0
+```
+　
+### ディープカット
+- get_level Yn
+
+　　allocate 後直ちに、Ynを現在のBCにセットする
+- cut Yn
+
+　　Ynで示された点以降のチョイス・ポイントは（もしあれば）すべて破棄し、
+
+　　なおかつ、トレイルからその時点までの新たな無条件バインディングを破棄する
+
+```
+例えば
+        a :- b,!,c.
+
+は、以下のようにコンパイルされる
+
+        allocate
+        get_level Y1
+        call b/0,1
+        cut Y1
+        deallocate
+        execute c/0
+```
