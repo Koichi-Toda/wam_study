@@ -184,11 +184,11 @@ push(pdl,X):-
     (retract(pdl(Z)) ; Z = []),
     assert(pdl([X|Z])).
 
-unify(x:5,a:3):-
-    reg_ax(x:5,V_X5),
-    reg_ax(a:3,V_A3),
-    push(pdl,V_X5),
-    push(pdl,V_A3),
+unify(R1,R2):-
+    reg_ax(R1,V_R1),
+    reg_ax(R2,V_R2),
+    push(pdl,V_R1),
+    push(pdl,V_R2),
     unify_loop.
 
 unify(_,_):- writeln(unify_failed),fail.
