@@ -42,7 +42,7 @@ store_code([X|Z]):-
 store_query(X):-
     reg_p(N),
     store_code(X),
-    redefine(reg_p(N)).
+    redefine(reg_p(N)). % Pを、queryの最初の命令にポイントされるように調整
 
 % looping (when register P is terminated(-1) should be stop)
 wam_vm :- reg_p(-1) ; wam_exec, wam_vm.
