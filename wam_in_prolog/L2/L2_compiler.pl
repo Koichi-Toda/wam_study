@@ -60,6 +60,7 @@ prolog(Code,Query):-
 :- dynamic reg_h/1, reg_s/1, reg_p/1, reg_cp/1, reg_e/1.
 :- dynamic reg_ax/2.
 :- dynamic unify_mode/1.
+:- dynamic parmanent_var_list/1.
 
 % HEAP is part of main memory (all memory accsess can be use store/2 ).
 set(heap(ADDRESS,VALUE)):- assert(store(ADDRESS,VALUE)).
@@ -339,11 +340,17 @@ compile_codes([T|TL],[L|LL]):-
     compile_codes(TL,LL).
 
 
- compile_code(Head:-Body,L2):-
+compile_code(Head:-Body,L2):-
     assert(count(0)),
+
+    % parmanent 変数のリストアップ
+    vlist(Head:-Body,VLIST),
+    find_parmanent(VLIST,ParmList), writeln(parmanent_var_list(ParmList)),
+    assert(parmanent_var_list(ParmList)),
+
     terms_top(Head,_,ReOrdered),
-    reg_assign(ReOrdered,RetL,[],LLL),!,writeln(reg_assign(LLL)),
-    var_assign(RetL,L,[],LLL2),
+    reg_assign(ReOrdered,RetL,[],LLL),!,writeln(head(reg_assign(ReOrdered,RetL,[],LLL))),
+    var_assign(RetL,L,[],LLL2),writeln(head(var_assign(RetL,L,[],LLL2))),
 
     Vin = LLL2,
     compile_body(Vin,_Vout,Body,WAM_Body),
@@ -496,6 +503,41 @@ reg_cnt(X):-
   (retract(cnt(N)) ; N is 0),
   X is N + 1,
   assert(cnt(X)).
+
+
+
+
+
+vlist(Head:-(FirstBody,RestBody),[L|L2]):-
+    term_variables((Head,FirstBody),L),
+    vlist_body(RestBody,L2).
+
+vlist(_Head:-_SingleBody,[]).
+
+vlist_body((A,B),[AL|BL]):-
+    term_variables(A,AL),
+    vlist_body(B,BL).
+
+vlist_body(LastBody,[L]):-
+    term_variables(LastBody,L).
+
+
+find_parmanent(List,ParmList):-
+  flatten(List,Rest_),
+  find_dup(Rest_,ParmList).
+find_dup([_|[]],[]).
+find_dup([X|Z],R):-
+  fdup(X,Z,R1),
+  find_dup(Z,R2),
+  append(R1,R2,R).
+fdup(_,[],[]).
+fdup(V,[W|_],[V]):-
+   V == W.
+fdup(V,[_|Z],R):-
+  fdup(V,Z,R).
+
+
+
 
 
 
