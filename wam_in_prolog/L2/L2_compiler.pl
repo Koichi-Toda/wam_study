@@ -37,11 +37,17 @@ prolog_query:-
     store_query(WAM_Query),
     wam_vm.
 
+% prolog2(CodeL,Query):-
+%    compile_codes(CodeL,WAM_CodeL),writeln(code(CodeL)),writeln(wamcode(WAM_CodeL)),
+%    !,compile_query(Query,WAM_Query),writeln(wamquery(Query,WAM_Query)),
+%    !,wam2((CodeL,WAM_CodeL),WAM_Query),
+%    listing([code_area,reg_ax,reg_h,reg_p,store]).
+
+% for debugging
 prolog2(CodeL,Query):-
-    compile_codes(CodeL,WAM_CodeL),writeln((code(CodeL),wamcode(WAM_CodeL))),
-    !,compile_query(Query,WAM_Query),writeln(wamquery(Query,WAM_Query)),
-    !,wam2((CodeL,WAM_CodeL),WAM_Query),
-    listing([code_area,reg_ax,reg_h,reg_p,store]).
+     compile_codes(CodeL,WAM_CodeL),writeln(code(CodeL)),writeln(wamcode(WAM_CodeL)),
+     !,compile_query(Query,WAM_Query),writeln(wamquery(Query,WAM_Query)).
+
 
 prolog(Code,Query):-
     compile_code(Code,WAM_Code),writeln(wamcode(WAM_Code)),
@@ -51,7 +57,7 @@ prolog(Code,Query):-
     listing([code_area,reg_ax,reg_h,reg_p,store]).
 
 :- dynamic code_area/3, store/2.
-:- dynamic reg_h/1, reg_s/1, reg_p/1, reg_cp/1.
+:- dynamic reg_h/1, reg_s/1, reg_p/1, reg_cp/1, reg_e/1.
 :- dynamic reg_ax/2.
 :- dynamic unify_mode/1.
 
@@ -60,9 +66,14 @@ set(heap(ADDRESS,VALUE)):- assert(store(ADDRESS,VALUE)).
 reset(heap(ADDRESS,VALUE)):- retract(store(ADDRESS,VALUE)).
 heap(ADDRESS,VALUE):- store(ADDRESS,VALUE).
 
+% STACK is also part of main memory. STACK address is start from 10000.
+stack(ADDRESS,VALUE):- store(ADDRESS,VALUE).
+
 wam2((CodeL,WAM_CodeL),WAM_Query):-
     assert(reg_h(0)),
     assert(reg_p(0)),
+    assert(reg_cp(0)),
+    assert(reg_e(10000)),
     store_codes(CodeL,WAM_CodeL),
     store_query(WAM_Query),
     wam_vm.
@@ -70,12 +81,21 @@ wam2((CodeL,WAM_CodeL),WAM_Query):-
 wam((F/A,WAM_Code),WAM_Query):-
     assert(reg_h(0)),
     assert(reg_p(0)),
+    assert(reg_cp(0)),
+    assert(reg_e(10000)),
     store_code(F/A,WAM_Code),
     store_query(WAM_Query),
     wam_vm.
 
 % store wam code into CODE_AREA
 store_codes([],[]).
+
+store_codes([Head:-_Body|CodeL],[WAM_Code|WAM_CodeL]):-
+    functor(Head,F,A),
+    writeln(store_code(F/A,WAM_Code)),
+    store_code(F/A,WAM_Code),
+    store_codes(CodeL,WAM_CodeL).
+
 store_codes([Code|CodeL],[WAM_Code|WAM_CodeL]):-
     functor(Code,F,A),
     writeln(store_code(F/A,WAM_Code)),
@@ -83,7 +103,6 @@ store_codes([Code|CodeL],[WAM_Code|WAM_CodeL]):-
     store_codes(CodeL,WAM_CodeL).
 
 store_code(Label,[X|Z]):-
-    writeln(store_code__here),
     increment(reg_p(N)),
     writeln(reg_p(N)),
     assert(code_area(N,Label,X)),
@@ -91,7 +110,7 @@ store_code(Label,[X|Z]):-
 store_code([]).
 store_code([X|Z]):-
     increment(reg_p(N)),
-    assert(code_area(N,_,X)),
+    assert(code_area(N,null,X)),
     store_code(Z).
 
 % store wam query into CODE_AREA
@@ -122,9 +141,13 @@ wam_exec:-
 increment(reg_p(N)):- retract(reg_p(N)), N1 is N + 1, assert(reg_p(N1)).
 increment(reg_h(N)):- retract(reg_h(N)), N1 is N + 1, assert(reg_h(N1)).
 update(reg_p(N)):- retract(reg_p(_)), assert(reg_p(N)).
+update(reg_cp(N)):- retract(reg_cp(_)), assert(reg_cp(N)).
+update(reg_e(N)):- retract(reg_e(_)), assert(reg_e(N)).
 update(reg_ax(AX,VALUE)):- (retract(reg_ax(AX,_));true), assert(reg_ax(AX,VALUE)).
 update(reg_s(N)):- (retract(reg_s(_)); true), assert(reg_s(N)).
 update(unify_mode(M)):- (retract(unify_mode(_)) ; true), assert(unify_mode(M)).
+update(stack(ADDRESS,VALUE)):- (retract(store(ADDRESS,_)); true), assert(store(ADDRESS,VALUE)).
+
 
 %% WAM instuctions (for query)
 wam_inst(put_variable(x:X,a:A)):-
@@ -133,6 +156,13 @@ wam_inst(put_variable(x:X,a:A)):-
     set(heap(H, H_VALUE)),
     update(reg_ax(x:X, H_VALUE)),
     update(reg_ax(a:A, H_VALUE)).
+
+wam_inst(put_value(V,AX)):-
+    update(reg_ax(AX,V)).
+
+
+wam_inst(get_variable(V,AX)):-
+    update(reg_ax(V,AX)).
 
 wam_inst(set_variable(AX)):-
     increment(reg_h(H)),
@@ -156,14 +186,28 @@ wam_inst(put_structure(F/A,AX)):-
 % 「CP ← P + instruction_size(P)」について、この環境の場合 CP ← P + 1 で足りると判断した
 % そして、callが呼び出されるときには、既にカウントアップ(+1)しているので、Pの値をCPに単に代入することとした
 wam_inst(call(Label)):-
-    (retract(reg_cp(_)) ; true),
     reg_p(P),
-    assert(reg_cp(P)),
+    update(reg_cp(P)), % reg_p(P)は、すでに P+1されているので、そのままセットすればよいと考える
     code_area(N,Label,FirstInst),
     N1 is N + 1,
-    update(reg_p(N1)),
-    writeln(reg_cp(P)),
+    update(reg_p(N1)),writeln(reg_cp(P)),
     !,wam_inst(FirstInst).
+
+wam_inst(allocate(N)):-
+    reg_e(E),
+    reg_cp(CP),
+    E2 is E+2, stack(E2,StackE2), NewE is E + StackE2 + 3,
+    NewE1 is NewE + 1, update(stack(NewE1,CP)),
+    NewE2 is NewE + 2, update(stack(NewE2,N)),
+    update(reg_e(NewE)).
+
+wam_inst(deallocate):-
+    reg_e(E),
+    E1 is E+1, stack(E1,NewP),
+    update(reg_p(NewP)),
+    stack(E,NewE),
+    update(reg_e(NewE)).
+
 
 
 %% WAM instructions (for program)
@@ -189,7 +233,7 @@ wam_inst(unify_variable(AX)):-
     set(heap(H,H_VALUE)),
     update(reg_ax(AX,H_VALUE)).
 
-% set CP
+% proceed (set P <- CP)
 wam_inst(proceed):-
      reg_cp(N),
      update(reg_p(N)).
@@ -299,16 +343,19 @@ compile_codes([T|TL],[L|LL]):-
     assert(count(0)),
     terms_top(Head,_,ReOrdered),
     reg_assign(ReOrdered,RetL,[],LLL),!,writeln(reg_assign(LLL)),
-    var_assign(RetL,L,[],LLL2),writeln(var_assign(LLL2)),
+    var_assign(RetL,L,[],LLL2),
 
-    compile_query(Body,WAM_Query),
-    append(L,WAM_Query,L2).
+    Vin = LLL2,
+    compile_body(Vin,_Vout,Body,WAM_Body),
+    append(L,WAM_Body,L2_),
+    append(L2_,[proceed],L2).
 
 compile_code(T,L):-
-    assert(count(0)),
+    set_counter(0),
     terms_top(T,_,ReOrdered),
     reg_assign(ReOrdered,RetL,[],_),!,
-    var_assign(RetL,L,[],_).
+    var_assign(RetL,L_,[],_),
+    append(L_,[proceed],L).
 
 % terms_top(Head:-Body,_,ReOrdered):-
 %    compound(Head),!,
@@ -319,15 +366,137 @@ compile_code(T,L):-
 %    compile_body(Body,_BL),
 %    compile_query(Body,WAM_Query),writeln(wam_body_(WAM_Query)).
 
-terms_top(X,_,ReOrdered2):-
+terms_top(X,_,ReOrdered):-
     compound(X),!,
     functor(X,N,_),X =.. [N|S],
-    sub_terms_top(S,ZZ),writeln(sub_terms_top(S,ZZ)),
+    sub_terms_top(S,ZZ),
     pickup_args(ZZ,Args,Subs),
-    append(Args,Subs,ReOrdered),
-    append(ReOrdered,[[proceed]],ReOrdered2).
+    append(Args,Subs,ReOrdered).
 
-compile_body(Body,_BL):- writeln(compile_body(Body)).
+compile_body(Vin,Vout,(A,B),L3):-
+  compile_body(Vin,Vout_,A,L),
+  retract(cnt(_)),assert(cnt(0)),
+  compile_body(Vout_,Vout,B,L2),
+  append(L,L2,L3).
+
+compile_body(Vin,Vout,RootPropaty,L):-
+  functor(RootPropaty,Fname,Arity), RootPropaty =.. [Fname|S],
+  body_args(S,S_OUT),
+  body_deep_trans(Vin,S_OUT,S_OUT_D,VL),
+  !,body_xreg_assign(S_OUT_D,S_OUT_D2,VL,_),!,
+  body_var_assign(S_OUT_D2,S_OUT_D3,VL,_),
+  Vout = VL,
+  append(S_OUT_D3,[call(Fname/Arity)],L).
+
+
+body_args([],[]).
+body_args([X|Z],[X2|Z2]):-
+  body_args_(X,X2),
+  body_args(Z,Z2).
+body_args_(X,(X,a:C)):-
+  reg_cnt(C).
+
+
+body_deep_trans(Vin,[],[],Vin).
+body_deep_trans(Vin,[X|Z],[X2|Z2],VL):-
+  body_deep_trans_(Vin,X,X2,Vin_),
+  body_deep_trans(Vin_,Z,Z2,VL).
+
+body_deep_trans_(Vin,(V,Arg),put_value(x:Index,Arg),Vout):-
+  body_find_var(V,Vin,Index),
+  Vout = Vin.
+body_deep_trans_(Vin,(V,Arg),put_variable(x:C,Arg),[vpair(C,V)|Vin]):-
+  var(V),!,counter(C).
+body_deep_trans_(Vin,(X,Arg),Z,[]):- %%% TODO: ここが [] なのが、意味が分かっていない、Vinに置き換える必要があるとおもいいつつ。。。
+　writeln(body_deep_trans(Vin)), %%% INSPECT_CODE この辺は、まだちゃんと実装されていないのだろうけど・・・ちょっと後回しにする
+  compound(X),!,
+  functor(X,Fname,Arity), X =.. [Fname|S],
+  body_sub_terms(S,S_,Reorder),
+  Z = [reorder(Reorder,[put_structure(Fname/Arity)=Arg|S_])].
+body_deep_trans_(Vin,(X,Arg),(put_structure(X/0,Arg),Vin)):-
+  atom(X),!.
+
+
+body_sub_terms([],[],[]).
+body_sub_terms([X|Y],[A|B],Z):-
+  body_terms(X,A,X_),
+  body_sub_terms(Y,B,Y_),
+  append(X_,Y_,Z).
+
+
+%% body フラット化処理本体
+body_terms(X,assign_var(N/A)=TmpV,Z):-
+  compound(X),!,
+  functor(X,N,A),X =.. [N|S],
+  body_sub_terms(S,S_,ReOrder),
+  Z = [reorder(ReOrder,[put_structure(N/A)=TmpV|S_])].
+body_terms(X,assign_var(X),[]):-
+  var(X),!.
+
+%% 引数レジスタのために一枚構造がはさまった
+body_xreg_assign([],[],B,B).
+body_xreg_assign([X|Z],Z3,V,V3):-
+  body_reg_assign(X,X2,V,V2),
+  body_xreg_assign(Z,Z2,V2,V3),
+  append(X2,Z2,Z3).
+
+body_reg_assign(put_variable(A,B),[put_variable(A,B)],V,V).
+body_reg_assign(put_value(A,B),[put_value(A,B)],V,V).
+body_reg_assign([],[],V,V).
+body_reg_assign([reorder(X1,X2)|Y],Z,V,V3):-
+   body_assign_register(X2,A2,V,V1),
+   body_reg_assign(X1,A1,V1,V2),append(A1,A2,A),
+   body_reg_assign(Y,B,V2,V3),append(A,B,Z).
+
+
+body_assign_register([],[],VL,VL).
+body_assign_register([X|Y],[A|B],VL,Vnew2):-
+  body_reg_match(X,A,VL,Vnew),
+  body_assign_register(Y,B,Vnew,Vnew2).
+
+
+body_reg_match(put_structure(X),(put_structure(X),x:C),VL,VL):-　reg_cnt(C).
+body_reg_match(assign_var(X),(assign_var(X),x:Index),VL,VL):-　find_var(X,VL,Index).
+body_reg_match(assign_var(X),(assign_var(X),x:C),VL,[vpair(C,X)|VL]):-　reg_cnt(C).
+body_reg_match(put_structure(X)=a:Index,(put_structure(X),a:Index),VL,VL).
+body_reg_match(put_structure(X)=V,(put_structure(X),x:C),VL,VL):-　var(V),!,reg_cnt(C),V = C.
+body_reg_match(put_structure(X)=V,(put_structure(X),x:V),VL,VL).
+body_reg_match(assign_var(X)=V,(assign_var(X),x:C),VL,VL):-　var(V),!,reg_cnt(C),V = C.
+body_reg_match(assign_var(X)=V,(assign_var(X),V),VL,VL).
+
+
+body_var_assign([],[],VL,VL).
+body_var_assign([X|Y],[A|B],VL,VL__):-
+  body_var_assign(X,A,VL,VL_),
+  body_var_assign(Y,B,VL_,VL__).
+
+body_var_assign((assign_var(V),_),set_value(x:Index),VL,VL):-
+  body_find_var(V,VL,Index).
+body_var_assign((assign_var(V),x:Index),set_variable(x:Index),VL,VL_):-
+  VL_ = [vpair(Index,V)|VL].
+
+body_var_assign((put_structure(X),x:Index),put_structure(X,x:Index),VL,[vpair(Index,X)|VL]).
+body_var_assign((put_structure(X),a:Index),put_structure(X,a:Index),VL,[vpair(Index,X)|VL]).
+body_var_assign((put_variable(A,B)),(put_variable(A,B)),VL,VL).
+body_var_assign((put_value(A,B)),(put_value(A,B)),VL,VL).
+
+
+
+body_find_var(Var,[vpair(Index,V)|_],Index):-
+    Var == V.
+body_find_var(Var,[_|L],Index):-
+    find_var(Var,L,Index).
+body_find_var(_,[],_):-
+    false.
+
+
+
+% register counter
+reg_cnt(X):-
+  (retract(cnt(N)) ; N is 0),
+  X is N + 1,
+  assert(cnt(X)).
+
 
 
 pickup_args([],[],[]).
@@ -343,6 +512,8 @@ sub_terms_top([X|Y],ZZZ):-
     sub_terms_top(Y,ZZ_),
     append(ZZ,ZZ_,ZZZ).
 
+% terms_top_down は、述語の引数部分に対応すると理解、
+% このため、引数レジスタを指定するよう変換されると理解
 terms_top_down(X,unify_var(N/A)=_,ZZ):-
     compound(X),!,
     functor(X,N,A),X =.. [N|S],
@@ -355,9 +526,10 @@ terms_top_down(X,unify_var(X),ZZ):-
     counter(C),
     ZZ = [arg_and_sub([[unify_var(X,_,C)]],[])].
 
-terms_top_down(X,unify_var(X/0)=Tmp,ZZ):-
+terms_top_down(X,unify_var(X/0)=_,ZZ):-
     atom(X),!,
-    ZZ = [arg_and_sub([[get_structure(X/0)=Tmp]],[])].
+    counter(C),
+    ZZ = [arg_and_sub([[get_structure(X/0,C)]],[])].
 
 
 %% Frat fomat transform main part
@@ -383,7 +555,9 @@ counter(X):-
     retract(count(N)),
     X is N + 1,
     assert(count(X)).
-
+set_counter(X):-
+    (retract(count(_)) ; true),
+    assert(count(X)).
 
 %% register assignment main part (with reordering register number)
 reg_assign([],[],V,V).
