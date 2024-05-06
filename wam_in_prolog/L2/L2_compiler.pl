@@ -37,17 +37,11 @@ prolog_query:-
     store_query(WAM_Query),
     wam_vm.
 
-% prolog2(CodeL,Query):-
-%    compile_codes(CodeL,WAM_CodeL),writeln(code(CodeL)),writeln(wamcode(WAM_CodeL)),
-%    !,compile_query(Query,WAM_Query),writeln(wamquery(Query,WAM_Query)),
-%    !,wam2((CodeL,WAM_CodeL),WAM_Query),
-%    listing([code_area,reg_ax,reg_h,reg_p,store]).
-
-% for debugging
 prolog2(CodeL,Query):-
-     compile_codes(CodeL,WAM_CodeL),writeln(code(CodeL)),writeln(wamcode(WAM_CodeL)),
-     !,compile_query(Query,WAM_Query),writeln(wamquery(Query,WAM_Query)).
-
+    compile_codes(CodeL,WAM_CodeL),writeln(code(CodeL)),writeln(wamcode(WAM_CodeL)),
+    !,compile_query(Query,WAM_Query),writeln(wamquery(Query,WAM_Query)),
+    !,wam2((CodeL,WAM_CodeL),WAM_Query),
+    listing([code_area,reg_ax,reg_h,reg_p,store]).
 
 prolog(Code,Query):-
     compile_code(Code,WAM_Code),writeln(wamcode(WAM_Code)),
@@ -75,6 +69,12 @@ wam2((CodeL,WAM_CodeL),WAM_Query):-
     assert(reg_p(0)),
     assert(reg_cp(0)),
     assert(reg_e(10000)),
+    % STACKの初期値を設定(allocateで参照されるため、現在の仕組み上初期値が必要と考える)
+    % このような実装がエレガントだとは考えない
+    update(stack(10000,10000)), % １つ前の E値(初期値として10000としておく)
+    update(stack(10001,0)), % CP値(初期値は 0)
+    update(stack(10002,0)), % parmanent 変数の数(初期値は 0)
+
     store_codes(CodeL,WAM_CodeL),
     store_query(WAM_Query),
     wam_vm.
@@ -84,6 +84,12 @@ wam((F/A,WAM_Code),WAM_Query):-
     assert(reg_p(0)),
     assert(reg_cp(0)),
     assert(reg_e(10000)),
+    % STACKの初期値を設定(allocateで参照されるため、現在の仕組み上初期値が必要と考える)
+    % このような実装がエレガントだとは考えない
+    update(stack(10000,10000)), % １つ前の E値(初期値として10000としておく)
+    update(stack(10001,0)), % CP値(初期値は 0)
+    update(stack(10002,0)), % parmanent 変数の数(初期値は 0)
+
     store_code(F/A,WAM_Code),
     store_query(WAM_Query),
     wam_vm.
@@ -93,19 +99,16 @@ store_codes([],[]).
 
 store_codes([Head:-_Body|CodeL],[WAM_Code|WAM_CodeL]):-
     functor(Head,F,A),
-    writeln(store_code(F/A,WAM_Code)),
     store_code(F/A,WAM_Code),
     store_codes(CodeL,WAM_CodeL).
 
 store_codes([Code|CodeL],[WAM_Code|WAM_CodeL]):-
     functor(Code,F,A),
-    writeln(store_code(F/A,WAM_Code)),
     store_code(F/A,WAM_Code),
     store_codes(CodeL,WAM_CodeL).
 
 store_code(Label,[X|Z]):-
     increment(reg_p(N)),
-    writeln(reg_p(N)),
     assert(code_area(N,Label,X)),
     store_code(Z).
 store_code([]).
@@ -153,6 +156,13 @@ update(stack(ADDRESS,VALUE)):- (retract(store(ADDRESS,_)); true), assert(store(A
 
 
 %% WAM instuctions (for query)
+wam_inst(put_variable(y:Y,a:A)):-
+    reg_e(E),
+    YADDR is E + Y + 2,
+    REF_VALUE = (ref, YADDR),
+    update(stack(YADDR,REF_VALUE)),
+    update(reg_ax(a:A, REF_VALUE)).
+
 wam_inst(put_variable(x:X,a:A)):-
     increment(reg_h(H)),
     H_VALUE = (ref, H),
@@ -160,12 +170,26 @@ wam_inst(put_variable(x:X,a:A)):-
     update(reg_ax(x:X, H_VALUE)),
     update(reg_ax(a:A, H_VALUE)).
 
-wam_inst(put_value(V,AX)):-
-    update(reg_ax(AX,V)).
+wam_inst(put_value(y:Y,AX)):-
+    reg_e(E),
+    YADDR is E + Y + 2,
+    stack(YADDR,VALUE),
+    update(reg_ax(AX,VALUE)).
 
+wam_inst(put_value(V,AX)):-
+　　 listing(reg_ax),
+    reg_ax(V,V_VALUE),
+    update(reg_ax(AX,V_VALUE)).
+
+wam_inst(get_variable(y:Index,AX)):-
+    reg_e(E),
+    YADDRESS is E + Index + 2,
+    reg_ax(AX,AX_VALUE),
+    update(stack(YADDRESS,AX_VALUE)).
 
 wam_inst(get_variable(V,AX)):-
-    update(reg_ax(V,AX)).
+    reg_ax(AX,AX_VALUE),
+    update(reg_ax(V,AX_VALUE)).
 
 wam_inst(set_variable(AX)):-
     increment(reg_h(H)),
@@ -193,15 +217,22 @@ wam_inst(call(Label)):-
     update(reg_cp(P)), % reg_p(P)は、すでに P+1されているので、そのままセットすればよいと考える
     code_area(N,Label,FirstInst),
     N1 is N + 1,
-    update(reg_p(N1)),writeln(reg_cp(P)),
+    update(reg_p(N1)),
     !,wam_inst(FirstInst).
 
 wam_inst(allocate(N)):-
     reg_e(E),
     reg_cp(CP),
-    E2 is E+2, stack(E2,StackE2), NewE is E + StackE2 + 3,
-    NewE1 is NewE + 1, update(stack(NewE1,CP)),
-    NewE2 is NewE + 2, update(stack(NewE2,N)),
+
+    E2 is E+2,
+    stack(E2,StackE2),
+    NewE is E + StackE2 + 3,
+    NewE1 is NewE + 1,
+    NewE2 is NewE + 2,
+
+    update(stack(NewE,E)),
+    update(stack(NewE1,CP)),
+    update(stack(NewE2,N)),
     update(reg_e(NewE)).
 
 wam_inst(deallocate):-
@@ -348,7 +379,10 @@ compile_code(Head:-Body,L2):-
 
     % parmanent 変数のリストアップ
     vlist(Head:-Body,VLIST),
-    find_parmanent(VLIST,ParmList), writeln(parm_list(ParmList)),
+    find_parmanent(VLIST,ParmList),
+
+    length(ParmList,N),
+    BeginL = [allocate(N)],
 
     terms_top(ParmList,Head,_,ReOrdered),
     reg_assign(ParmList,ReOrdered,RetL,[],LLL),!,writeln(head(reg_assign(ReOrdered,RetL,[],LLL))),
@@ -356,8 +390,9 @@ compile_code(Head:-Body,L2):-
 
     Vin = LLL2,
     compile_body(ParmList,Vin,_Vout,Body,WAM_Body),
-    append(L,WAM_Body,L2_),
-    append(L2_,[proceed],L2).
+    append(BeginL,L,LL),
+    append(LL,WAM_Body,L2_),
+    append(L2_,[deallocate],L2).
 
 compile_code(T,L):-
     set_counter(0),
@@ -413,11 +448,11 @@ body_deep_trans(ParmList,Vin,[X|Z],[X2|Z2],VL):-
 
 body_deep_trans_(ParmList,Vin,(V,Arg),put_value(REG:Index,Arg),Vout):-
   body_find_var(V,Vin,Index),
-  Vout = Vin,writeln(chekichek____(V,ParmList)),
-  (vmember(V,ParmList), writeln(incincincre_b1_reflaction(Index)), REG=y ; REG=x).
+  Vout = Vin,
+  (vmember(V,ParmList), REG=y ; REG=x).
 body_deep_trans_(ParmList,Vin,(V,Arg),put_variable(REG:C,Arg),[vpair(C,V)|Vin]):-
-  var(V),!,writeln(chekichek(V,vin(Vin),ParmList)),
-  (vmember(V,ParmList),increment(y_cnt(C)), writeln(incincincre_b1(C)), REG=y ; counter(C), REG=x).
+  var(V),!,
+  (vmember(V,ParmList),increment(y_cnt(C)), REG=y ; counter(C), REG=x).
 body_deep_trans_(ParmList,Vin,(X,Arg),Z,[]):- %%% TODO: ここが [] なのが、意味が分かっていない、Vinに置き換える必要があるとおもいいつつ。。。
 　writeln(body_deep_trans(Vin)), %%% INSPECT_CODE この辺は、まだちゃんと実装されていないのだろうけど・・・ちょっと後回しにする
   compound(X),!,
@@ -469,7 +504,7 @@ body_assign_register(ParmList,[X|Y],[A|B],VL,Vnew2):-
 body_reg_match(_ParmList,put_structure(X),(put_structure(X),x:C),VL,VL):-　reg_cnt(C).
 body_reg_match(_ParmList,assign_var(X),(assign_var(X),x:Index),VL,VL):-　find_var(X,VL,Index).
 body_reg_match(ParmList,assign_var(X),(assign_var(X),REG:C),VL,[vpair(C,X)|VL]):-
-  (vmember(X,ParmList), increment(y_cnt(C)), writeln(incincincre(C)), REG=y; reg_cnt(C), REG=x).
+  (vmember(X,ParmList), increment(y_cnt(C)), REG=y; reg_cnt(C), REG=x).
 body_reg_match(_ParmList,put_structure(X)=a:Index,(put_structure(X),a:Index),VL,VL).
 body_reg_match(_ParmList,put_structure(X)=V,(put_structure(X),x:C),VL,VL):-　var(V),!,reg_cnt(C),V = C.
 body_reg_match(_ParmList,put_structure(X)=V,(put_structure(X),x:V),VL,VL).
@@ -622,7 +657,7 @@ assign_register(ParmList,[X|Y],[A|B],VL,Vnew2):-
 reg_match(_ParmList,get_structure(X),(get_structure(X),x:C),VL,VL):-　counter(C).
 reg_match(_ParmList,unify_var(X),(unify_var(X),x:Index),VL,VL):-　find_var(X,VL,Index).
 reg_match(ParmList,unify_var(X),(unify_var(X),x:C),VL,[vpair(C,X)|VL]):-
-  (vmember(X,ParmList),increment(y_cnt(C)), writeln(incincincre3(C)); counter(C)).
+  (vmember(X,ParmList),increment(y_cnt(C)); counter(C)).
 reg_match(_ParmList,get_structure(X,A),(get_structure(X),a:A),VL,VL).
 reg_match(_ParmList,get_structure(X)=V,(get_structure(X),x:C),VL,VL):-　var(V),!,counter(C),V = C.
 reg_match(_ParmList,get_structure(X)=V,(get_structure(X),x:V),VL,VL).
@@ -632,7 +667,7 @@ reg_match(_ParmList,unify_var(X,x:Index,A),(unify_var(X),x:Index,a:A),VL,VL):- f
 % 以下の一行を追加したが、本当にこれでいいのか？半信半疑、まあ、結果は良好なり。。。
 reg_match(ParmList,unify_var(X,V,A),(unify_var(X),REG:C,a:A),VL,VL):-
   var(V),!,
-  (vmember(X,ParmList),increment(y_cnt(C)), writeln(incincincre4(C)), REG=y; counter(C), REG=x), writeln(pippin(X,ParmList,C)).
+  (vmember(X,ParmList), increment(y_cnt(C)), REG=y; counter(C), REG=x).
 
 reg_match(_ParmList,unify_var(X,V,A),(unify_var(X),V,a:A),VL,VL).
 reg_match(_ParmList,unify_var(X)=V,(unify_var(X),x:C),VL,VL):-　var(V),!,counter(C),V = C.
