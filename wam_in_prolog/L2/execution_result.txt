@@ -1,0 +1,87 @@
+#
+# Execution Result(L2)
+#
+# You can use swipl to exectute this L2 Language VM
+# https://www.swi-prolog.org/
+#
+
+$ swipl L2_compiler.pl 
+Welcome to SWI-Prolog (threaded, 64 bits, version 9.2.0)
+SWI-Prolog comes with ABSOLUTELY NO WARRANTY. This is free software.
+Please run ?- license. for legal details.
+
+For online help and background, visit https://www.swi-prolog.org
+For built-in help, use ?- help(Topic). or ?- apropos(Word).
+
+?- prolog2([(p(X,Y) :- q(X,Z),r(Z,Y)),q(a,b),r(b,d)],(p(A,B))).
+head(reg_assign([[unify_var(_3476,_6172,1)],[unify_var(_3478,_6228,2)]],[(unify_var(_3476),x:3,a:1),(unify_var(_3478),y:1,a:2)],[],[]))
+head(var_assign([(unify_var(_3476),x:3,a:1),(unify_var(_3478),y:1,a:2)],[get_variable(x:3,a:1),get_variable(y:1,a:2)],[],[vpair(1,_3478),vpair(3,_3476)]))
+code([(p(_3476,_3478):-q(_3476,_3484),r(_3484,_3478)),q(a,b),r(b,d)])
+wamcode([[allocate(2),get_variable(x:3,a:1),get_variable(y:1,a:2),put_value(x:3,a:1),put_variable(y:2,a:2),call(q/2),put_value(y:2,a:1),put_value(y:1,a:2),call(r/2),deallocate],[get_structure(a/0,a:1),get_structure(b/0,a:2),proceed],[get_structure(b/0,a:1),get_structure(d/0,a:2),proceed]])
+wamquery(p(_3536,_3538),[put_variable(x:3,a:1),put_variable(x:4,a:2),call(p/2)])
+:- dynamic reg_ax/2.
+
+reg_ax(a:1, (ref, 0)).
+reg_ax(x:4, (ref, 1)).
+reg_ax(a:2, (ref, 1)).
+reg_ax(x:3, (ref, 0)).
+
+:- dynamic code_area/3.
+
+code_area(0, p/2, allocate(2)).
+code_area(1, null, get_variable(x:3, a:1)).
+code_area(2, null, get_variable(y:1, a:2)).
+code_area(3, null, put_value(x:3, a:1)).
+code_area(4, null, put_variable(y:2, a:2)).
+code_area(5, null, call(q/2)).
+code_area(6, null, put_value(y:2, a:1)).
+code_area(7, null, put_value(y:1, a:2)).
+code_area(8, null, call(r/2)).
+code_area(9, null, deallocate).
+code_area(10, q/2, get_structure(a/0, a:1)).
+code_area(11, null, get_structure(b/0, a:2)).
+code_area(12, null, proceed).
+code_area(13, r/2, get_structure(b/0, a:1)).
+code_area(14, null, get_structure(d/0, a:2)).
+code_area(15, null, proceed).
+code_area(16, null, put_variable(x:3, a:1)).
+code_area(17, null, put_variable(x:4, a:2)).
+code_area(18, null, call(p/2)).
+
+:- dynamic reg_ax/2.
+
+reg_ax(a:1, (ref, 4)).
+reg_ax(a:2, (ref, 1)).
+reg_ax(x:3, (ref, 0)).
+reg_ax(x:4, (ref, 1)).
+
+:- dynamic reg_h/1.
+
+reg_h(8).
+
+:- dynamic reg_p/1.
+
+reg_p(19).
+
+:- dynamic store/2.
+
+store(0, (ref, 2)).
+store(1, (ref, 6)).
+store(2, (str, 3)).
+store(3, a/0).
+store(4, (str, 5)).
+store(5, b/0).
+store(6, (str, 7)).
+store(7, d/0).
+store(10000, 10000).
+store(10001, 0).
+tore(10002, 0).
+store(10003, 10000).
+store(10004, 19).
+store(10005, 2).
+store(10006, (ref, 1)).
+store(10007, (ref, 4)).
+
+true .
+
+?-
