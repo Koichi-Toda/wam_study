@@ -16,24 +16,13 @@
 % ?- prolog(p(X,X),(p(a,A),p(b,B))).
 % TODO: queryが単一か連言か？をどう判別できるのか？（prologの標準機能でなにかできるのか？）
 :- dynamic count/1.
-
-prolog_input_code(L):-
-    read(X),
-     (
-       X=end,read_prolog_code(L);
-       append(L,[X],L2),prolog_input_code(L2)
-     ).
-% TODO: 単一 cluse しかストアできないので、改善する（L2なら、単一ループでいいのではないか？）
-read_prolog_code(Code):-
-    compile_code(Code,WAM_Code),
-    functor(Code,F,A),
-    store_code(F/A,WAM_Code).
-
-prolog_query:-
-    read(Query),
-    compile_query(Query,WAM_Query),
-    store_query(WAM_Query),
-    wam_vm.
+:- dynamic code_area/3, store/2.
+:- dynamic reg_h/1, reg_s/1, reg_p/1, reg_cp/1, reg_e/1.
+:- dynamic reg_ax/2.
+:- dynamic unify_mode/1.
+:- dynamic y_cnt/1.
+:- dynamic l_cnt/1. % label counter (using for try_me_else, retry_me_else)
+:- dynamic trail/2, reg_hb/1, reg_b/1, reg_tr/1.
 
 prolog3(CodeL,Query):-
     compile_codes_multi(CodeL,WAM_CodeL_multi),
@@ -41,34 +30,7 @@ prolog3(CodeL,Query):-
     !,
     assert(l_cnt(10)),
     wam3((CodeL,WAM_CodeL_multi),WAM_Query),
-    listing([code_area,reg_ax,reg_h,reg_p,store]).
-
-% for debugging
-% prolog3(CodeL,Query):-
-%    compile_codes_multi(CodeL,WAM_CodeL_multi),
-%    writeln(code(CodeL)),writeln(wamcode(WAM_CodeL_multi)),
-%    !,compile_query(Query,WAM_Query),writeln(wamquery(Query,WAM_Query)).
-
-prolog2(CodeL,Query):-
-    compile_codes(CodeL,WAM_CodeL),writeln(code(CodeL)),writeln(wamcode(WAM_CodeL)),
-    !,compile_query(Query,WAM_Query),writeln(wamquery(Query,WAM_Query)),
-    !,wam2((CodeL,WAM_CodeL),WAM_Query),
-    listing([code_area,reg_ax,reg_h,reg_p,store]).
-
-prolog(Code,Query):-
-    compile_code(Code,WAM_Code),writeln(wamcode(WAM_Code)),
-    compile_query(Query,WAM_Query),writeln(wamquery(WAM_Query)),
-    functor(Code,F,A),
-    wam((F/A,WAM_Code),WAM_Query),
-    listing([code_area,reg_ax,reg_h,reg_p,store]).
-
-:- dynamic code_area/3, store/2.
-:- dynamic reg_h/1, reg_s/1, reg_p/1, reg_cp/1, reg_e/1.
-:- dynamic reg_ax/2.
-:- dynamic unify_mode/1.
-:- dynamic y_cnt/1.
-:- dynamic l_cnt/1.
-:- dynamic trail/2, reg_hb/1, reg_b/1, reg_tr/1.
+    listing([code_area,reg_ax,reg_h,reg_p, reg_cp, reg_hb, reg_b, reg_tr, trail, store]).
 
 
 % HEAP is part of main memory (all memory accsess can be use store/2 ).
@@ -94,37 +56,6 @@ wam3((CodeL,WAM_CodeL_multi),WAM_Query):-
     update(stack(10002,0)), % parmanent 変数の数(初期値は 0)
 
     store_codes3(CodeL,WAM_CodeL_multi),
-    store_query(WAM_Query),
-    wam_vm.
-
-
-wam2((CodeL,WAM_CodeL),WAM_Query):-
-    assert(reg_h(0)),
-    assert(reg_p(0)),
-    assert(reg_cp(0)),
-    assert(reg_e(10000)),
-    % STACKの初期値を設定(allocateで参照されるため、現在の仕組み上初期値が必要と考える)
-    % このような実装がエレガントだとは考えない
-    update(stack(10000,10000)), % １つ前の E値(初期値として10000としておく)
-    update(stack(10001,0)), % CP値(初期値は 0)
-    update(stack(10002,0)), % parmanent 変数の数(初期値は 0)
-
-    store_codes(CodeL,WAM_CodeL),
-    store_query(WAM_Query),
-    wam_vm.
-
-wam((F/A,WAM_Code),WAM_Query):-
-    assert(reg_h(0)),
-    assert(reg_p(0)),
-    assert(reg_cp(0)),
-    assert(reg_e(10000)),
-    % STACKの初期値を設定(allocateで参照されるため、現在の仕組み上初期値が必要と考える)
-    % このような実装がエレガントだとは考えない
-    update(stack(10000,10000)), % １つ前の E値(初期値として10000としておく)
-    update(stack(10001,0)), % CP値(初期値は 0)
-    update(stack(10002,0)), % parmanent 変数の数(初期値は 0)
-
-    store_code(F/A,WAM_Code),
     store_query(WAM_Query),
     wam_vm.
 
@@ -225,11 +156,7 @@ update(reg_ax(AX,VALUE)):- (retract(reg_ax(AX,_));true), assert(reg_ax(AX,VALUE)
 update(reg_s(N)):- (retract(reg_s(_)); true), assert(reg_s(N)).
 update(y_cnt(N)):- (retract(y_cnt(_)); true), assert(y_cnt(N)).
 update(unify_mode(M)):- (retract(unify_mode(_)) ; true), assert(unify_mode(M)).
-update(stack(ADDRESSF,VALUE)):-
-    ADDRESS is ADDRESSF,
-    (retract(store(ADDRESS,_)); true),
-    assert(store(ADDRESS,VALUE)),
-    writeln(assert_a_a_a(store(ADDRESS,VALUE))).
+update(stack(ADDRESSF,VALUE)):- ADDRESS is ADDRESSF, (retract(store(ADDRESS,_)); true), assert(store(ADDRESS,VALUE)).
 update(trail(T,A)):- (retract(trail(T,_)); true), assert(trail(T,A)).
 update(reg_h(H)):- (retract(reg_h(_)); true), assert(reg_h(H)).
 update(reg_hb(HB)):- (retract(reg_hb(_)); true), assert(reg_hb(HB)).
@@ -244,7 +171,7 @@ wam_inst(put_variable(y:Y,a:A)):-
     reg_e(E),
     YADDR is E + Y + 2,
     REF_VALUE = (ref, YADDR),
-    update(stack(YADDR,REF_VALUE)), writeln((put_variable________(y:Y,a:A),update(stack(YADDR,REF_VALUE)))),
+    update(stack(YADDR,REF_VALUE)),
     update(reg_ax(a:A, REF_VALUE)).
 
 wam_inst(put_variable(x:X,a:A)):-
@@ -254,10 +181,9 @@ wam_inst(put_variable(x:X,a:A)):-
     update(reg_ax(x:X, H_VALUE)),
     update(reg_ax(a:A, H_VALUE)).
 
-wam_inst(put_value(y:Y,AX)):-
+wam_inst(put_value(y:YIndex,AX)):-
     reg_e(E),
-    YADDR is E + Y + 2,
-    stack(YADDR,VALUE),
+    stack(E + YIndex + 2,VALUE), % get parmanent variable value.
     update(reg_ax(AX,VALUE)).
 
 wam_inst(put_value(V,AX)):-
@@ -265,12 +191,11 @@ wam_inst(put_value(V,AX)):-
     reg_ax(V,V_VALUE),
     update(reg_ax(AX,V_VALUE)).
 
-wam_inst(get_variable(y:Index,AX)):-
+wam_inst(get_variable(y:YIndex,AX)):-
     reg_e(E),
-    YADDRESS is E + Index + 2,
     reg_ax(AX,AX_VALUE),
-    update(stack(YADDRESS,AX_VALUE)),
-    writeln((get_variable___________(y:Index,AX),update(stack(YADDRESS,AX_VALUE)))).
+    update(stack(E + YIndex + 2,AX_VALUE)), % save parmanent variable.
+    writeln((get_variable___________(y:YIndex,AX),update(stack(E + YIndex + 2,AX_VALUE)))).
 
 wam_inst(get_variable(V,AX)):-
     reg_ax(AX,AX_VALUE),
@@ -305,48 +230,28 @@ wam_inst(call(Label)):-
     update(reg_p(N1)),
     !,wam_inst(FirstInst).
 
-% wam_inst(allocate(N)):-
-%    reg_e(E),
-%    reg_cp(CP),
-%
-%    E2 is E+2,
-%    stack(E2,StackE2),
-%    NewE is E + StackE2 + 3,
-%    NewE1 is NewE + 1,
-%    NewE2 is NewE + 2,
-%
-%    update(stack(NewE,E)),
-%    update(stack(NewE1,CP)),
-%    update(stack(NewE2,N)),
-%    update(reg_e(NewE)).
-
 wam_inst(allocate(N)):-
-    writeln(allocate_______(N)),
     reg_e(E),
     reg_cp(CP),
     reg_b(B),
 
     (E > B,
-       E2 is E+2,
-       stack(E2,StackE2),
+       stack(E + 2,StackE2),
        NewE is E + StackE2 + 3;
 
        stack(B,StackB),
        NewE is B + StackB + 7
     ),
 
-    NewE1 is NewE + 1,
-    NewE2 is NewE + 2,
-
     update(stack(NewE,E)),
-    update(stack(NewE1,CP)),
-    update(stack(NewE2,N)),
+    update(stack(NewE + 1,CP)),
+    update(stack(NewE + 2,N)),
     update(reg_e(NewE)).
 
 
 wam_inst(deallocate):-
     reg_e(E),
-    E1 is E+1, stack(E1,NewP),
+    stack(E + 1,NewP),
     update(reg_p(NewP)),
     stack(E,NewE),
     update(reg_e(NewE)).
@@ -360,11 +265,10 @@ wam_inst(try_me_else(L)):-
     reg_h(H),
 
     (E > B,
-       E2 is E+2,
-       stack(E2,StackE2),
+       stack(E + 2,StackE2),
        NewB is E + StackE2 + 3;
 
-       stack(B,StackB),writeln(stack_____(B,StackB)),
+       stack(B,StackB),
        NewB is B + StackB + 7
     ),
     findall(X,reg_ax(a:X,_),List),length(List,N), % num_of_args
@@ -377,10 +281,8 @@ wam_inst(try_me_else(L)):-
     update(stack(NewB + N + 4,INDEX_L)),
     update(stack(NewB + N + 5,TR)),
     update(stack(NewB + N + 6,H)),
-
     update(reg_b(NewB)),
     update(reg_hb(H)).
-
 
 
 wam_inst(retry_me_else(L)):-
@@ -484,13 +386,10 @@ save_args(I,N,B):-
 restore_args(I,N,_):-
     I > N.
 restore_args(I,N,B):-
-    BI is B + I,
-    stack(BI,Ai),
+    stack(B + I,Ai),
     update(reg_ax(a:I,Ai)),
     I1 is I + 1,
     restore_args(I1,N,B).
-
-
 
 
 
@@ -647,15 +546,6 @@ compile_code(T,L):-
     reg_assign([],ReOrdered,RetL,[],_),!,
     var_assign(RetL,L_,[],_),
     append(L_,[proceed],L).
-
-% terms_top(Head:-Body,_,ReOrdered):-
-%    compound(Head),!,
-%    functor(Head,N,_),Head =.. [N|S],
-%    sub_terms_top(S,ZZ),
-%    pickup_args(ZZ,Args,Subs),
-%    append(Args,Subs,ReOrdered),writeln(wam_head_(ReOrdered)),
-%    compile_body(Body,_BL),
-%    compile_query(Body,WAM_Query),writeln(wam_body_(WAM_Query)).
 
 terms_top(ParmList,X,_,ReOrdered):-
     compound(X),!,
@@ -818,22 +708,13 @@ vlist_body(LastBody,[L]):-
 %% これらを比較して、変数が重複する場合、2つ以上の Body に含まれる変数(= parmanent 変数)と判別できる。
 %% 以下では List を flatten して、変数の重複を発見することで、この変数を parmanent 変数と判断するようにしている。
 find_parmanent(List,ParmList):-
-  flatten(List,Rest_),
-  find_dup(Rest_,ParmList).
-
+  flatten(List,FList),
+  find_dup(FList,ParmList).
 find_dup([_|[]],[]).
-find_dup([X|Z],R):-
-  fdup(X,Z,R1),
-  find_dup(Z,R2),
-  append(R1,R2,R).
-
+find_dup([X|Z],R):-　fdup(X,Z,R1),　find_dup(Z,R2),　append(R1,R2,R).
 fdup(_,[],[]).
-fdup(V,[W|_],[V]):-
-   V == W.
-fdup(V,[_|Z],R):-
-  fdup(V,Z,R).
-
-
+fdup(V,[W|_],[V]):- V == W.　% V に対して１つでも重複を発見した場合（Vは parament 変数なので）、処理を中断して変数リストを返却する
+fdup(V,[_|Z],R):-　fdup(V,Z,R).
 
 
 pickup_args([],[],[]).
